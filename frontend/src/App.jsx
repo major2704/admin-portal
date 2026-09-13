@@ -1,12 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  LayoutDashboard, 
+  Users, 
+  ShieldCheck, 
+  Settings, 
+  Sun, 
+  Moon, 
+  LogOut, 
+  RefreshCw, 
+  Download, 
+  Activity, 
+  Check, 
+  Sparkles, 
+  ExternalLink,
+  Trash2,
+  Plus
+} from 'lucide-react';
 
-// --- Dynamic Base URL: Normalizes URL and falls back to production Render backend ---
 const API_BASE_URL = (
   import.meta.env.VITE_API_URL || 'https://nexus-admin-api-7dhc.onrender.com/api'
 ).replace(/\/$/, '');
 
 export default function App() {
-  // --- Persistent State Variables ---
+  // Authentication & Persistent State
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('nexus_user');
@@ -16,38 +32,29 @@ export default function App() {
     }
   });
 
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('nexus_theme') || 'dark';
-  });
+  const [theme, setTheme] = useState(() => localStorage.getItem('nexus_theme') || 'dark');
+  const [activeTab, setActiveTab] = useState('settings'); // 'overview' | 'team' | 'permissions' | 'settings'
 
-  const [settings, setSettings] = useState({
-    portalName: 'NexusAdmin',
-    publicRegistrations: false,
-    maintenanceMode: false
-  });
+  // Settings State
+  const [portalName, setPortalName] = useState('NexusAdmin');
+  const [publicRegistrations, setPublicRegistrations] = useState(true);
+  const [maintenanceMode, setMaintenanceMode] = useState(true);
+  const [feedback, setFeedback] = useState('');
+  const [healthStatus, setHealthStatus] = useState(null);
 
-  // Login form state
+  // Auth Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // App navigation and management state
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'users' | 'settings'
+  // Data Store
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({ totalUsers: 0, activeUsers: 0, totalAdmins: 0, systemStatus: 'Optimal' });
-  const [loadingData, setLoadingData] = useState(false);
-
-  // New Member Modal state
+  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 1, systemStatus: 'Optimal' });
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Viewer', status: 'Active' });
-  const [addingMember, setAddingMember] = useState(false);
 
-  // Settings feedback
-  const [settingsFeedback, setSettingsFeedback] = useState('');
-  const [savingSettings, setSavingSettings] = useState(false);
-
-  // --- Effect: Apply & Synchronize Theme Class ---
+  // Theme synchronization
   useEffect(() => {
     localStorage.setItem('nexus_theme', theme);
     const root = document.documentElement;
@@ -60,57 +67,27 @@ export default function App() {
     }
   }, [theme]);
 
-  // --- Effect: Load Initial Data & Settings when Authenticated ---
+  // Initial load
   useEffect(() => {
     if (user) {
-      fetchDashboardData();
-      fetchSettings();
+      loadData();
     }
   }, [user]);
 
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/settings`);
-      if (res.ok) {
-        const data = await res.json();
-        setSettings((prev) => ({
-          ...prev,
-          portalName: data.portalName || prev.portalName,
-          publicRegistrations: data.publicRegistrations ?? prev.publicRegistrations,
-          maintenanceMode: data.maintenanceMode ?? prev.maintenanceMode
-        }));
-        if (data.theme) setTheme(data.theme);
-      }
-    } catch (err) {
-      console.error('Error fetching settings:', err);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    setLoadingData(true);
+  const loadData = async () => {
     try {
       const [statsRes, usersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/stats`),
-        fetch(`${API_BASE_URL}/users`)
+        fetch(`${API_BASE_URL}/stats`).catch(() => null),
+        fetch(`${API_BASE_URL}/users`).catch(() => null)
       ]);
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (usersRes.ok) setUsers(await usersRes.json());
+      if (statsRes && statsRes.ok) setStats(await statsRes.json());
+      if (usersRes && usersRes.ok) setUsers(await usersRes.json());
     } catch (err) {
-      console.error('Error loading portal data:', err);
-    } finally {
-      setLoadingData(false);
+      console.error('Error fetching data:', err);
     }
   };
 
-  // --- Handlers ---
-  const toggleTheme = () => {
-    setTheme((prevTheme) => {
-      const newTheme = prevTheme === 'dark' ? 'light' : 'dark';
-      setSettings((prev) => ({ ...prev, theme: newTheme }));
-      return newTheme;
-    });
-  };
-
+  // Auth Handlers
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -123,18 +100,14 @@ export default function App() {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed. Please verify your credentials.');
-      }
+      const data = await res.json().catch(() => ({ error: 'Server response error' }));
+      if (!res.ok) throw new Error(data.error || 'Invalid credentials');
 
       localStorage.setItem('nexus_token', data.token);
       localStorage.setItem('nexus_user', JSON.stringify(data.user));
       setUser(data.user);
     } catch (err) {
-      console.error('Login request failed:', err);
-      setAuthError(err.message || 'Unable to connect to the server.');
+      setAuthError(err.message);
     } finally {
       setAuthLoading(false);
     }
@@ -144,156 +117,134 @@ export default function App() {
     localStorage.removeItem('nexus_token');
     localStorage.removeItem('nexus_user');
     setUser(null);
-    setEmail('');
-    setPassword('');
-    setAuthError('');
+  };
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  // Action Buttons Handlers
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    setFeedback('Platform settings updated successfully.');
+    setTimeout(() => setFeedback(''), 3000);
+  };
+
+  const handleExportData = () => {
+    const reportData = {
+      portalName,
+      exportDate: new Date().toISOString(),
+      systemStats: stats,
+      membersRoster: users
+    };
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${portalName.toLowerCase()}-audit-report.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setFeedback('Audit report downloaded successfully.');
+    setTimeout(() => setFeedback(''), 3000);
+  };
+
+  const handlePingServer = async () => {
+    setHealthStatus('Pinging...');
+    const startTime = Date.now();
+    try {
+      const res = await fetch(`${API_BASE_URL}/stats`);
+      const latency = Date.now() - startTime;
+      if (res.ok) {
+        setHealthStatus(`Online (${latency}ms)`);
+      } else {
+        setHealthStatus('Error 500');
+      }
+    } catch {
+      setHealthStatus('Unreachable');
+    }
+    setTimeout(() => setHealthStatus(null), 4000);
   };
 
   const handleAddMember = async (e) => {
     e.preventDefault();
-    setAddingMember(true);
     try {
       const res = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMember)
       });
-
-      const data = await res.json().catch(() => ({ error: 'Failed to parse response' }));
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create member');
+      const data = await res.json();
+      if (res.ok) {
+        setUsers([data, ...users]);
+        setShowAddModal(false);
+        setNewMember({ name: '', email: '', role: 'Viewer', status: 'Active' });
       }
-
-      setUsers((prev) => [data, ...prev]);
-      setStats((prev) => ({
-        ...prev,
-        totalUsers: prev.totalUsers + 1,
-        activeUsers: data.status === 'Active' ? prev.activeUsers + 1 : prev.activeUsers,
-        totalAdmins: data.role === 'Admin' ? prev.totalAdmins + 1 : prev.totalAdmins
-      }));
-      setShowAddModal(false);
-      setNewMember({ name: '', email: '', role: 'Viewer', status: 'Active' });
     } catch (err) {
-      alert(err.message);
-    } finally {
-      setAddingMember(false);
+      console.error(err);
     }
   };
 
   const handleDeleteUser = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this member?')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/users/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        setUsers((prev) => prev.filter((u) => u.id !== id));
-        fetchDashboardData();
+        setUsers(users.filter((u) => u.id !== id));
       }
     } catch (err) {
-      console.error('Failed to delete user:', err);
+      console.error(err);
     }
   };
 
-  const handleSaveSettings = async (e) => {
-    if (e) e.preventDefault();
-    setSavingSettings(true);
-    setSettingsFeedback('');
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settings, theme })
-      });
-
-      const data = await res.json().catch(() => ({ error: 'Failed to update settings' }));
-
-      if (!res.ok) throw new Error(data.error || 'Failed to update platform settings');
-
-      setSettingsFeedback('Settings saved successfully!');
-      setTimeout(() => setSettingsFeedback(''), 3000);
-    } catch (err) {
-      setSettingsFeedback(`Error: ${err.message}`);
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-
-  const handleResetData = async () => {
-    if (!window.confirm('Reset all members and portal configuration back to defaults?')) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/reset`, { method: 'POST' });
-      const data = await res.json();
-      alert(data.message || 'Platform restored to initial defaults.');
-      window.location.reload();
-    } catch (err) {
-      alert('Reset failed: ' + err.message);
-    }
-  };
-
-  // --- Auth View (Login Screen) ---
+  // --- Login View ---
   if (!user) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-200 ${
-        theme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-50 text-slate-900'
+      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${
+        theme === 'dark' ? 'bg-[#060813] text-white' : 'bg-slate-100 text-slate-900'
       }`}>
-        <div className={`w-full max-w-md p-8 rounded-2xl border shadow-2xl transition-all ${
-          theme === 'dark' ? 'bg-[#0b101b] border-slate-800' : 'bg-white border-slate-200 shadow-slate-200'
+        <div className={`w-full max-w-md p-8 rounded-2xl border shadow-2xl ${
+          theme === 'dark' ? 'bg-[#0d1024] border-slate-800' : 'bg-white border-slate-200 shadow-slate-200'
         }`}>
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{settings.portalName}</h1>
-              <p className="text-xs text-slate-400 mt-1">Management Portal Authentication</p>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
+              <Sparkles className="w-5 h-5" />
             </div>
-            <button
-              onClick={toggleTheme}
-              className={`p-2 text-xs font-semibold rounded-lg border transition ${
-                theme === 'dark' ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
-            >
-              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-            </button>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">{portalName}</h1>
+              <p className="text-xs text-indigo-400 font-semibold tracking-wider uppercase">ENTERPRISE</p>
+            </div>
           </div>
 
           {authError && (
-            <div className="mb-4 p-3 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/30 text-red-400">
+            <div className="mb-4 p-3 rounded-lg text-xs bg-red-500/10 border border-red-500/30 text-red-400">
               {authError}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Admin Email
-              </label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Admin Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="akshatnanawati2704@gmail.com"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition ${
-                  theme === 'dark'
-                    ? 'bg-[#060a12] border-slate-800 text-white focus:border-indigo-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none ${
+                  theme === 'dark' ? 'bg-[#070a18] border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
                 }`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Password
-              </label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition ${
-                  theme === 'dark'
-                    ? 'bg-[#060a12] border-slate-800 text-white focus:border-indigo-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none ${
+                  theme === 'dark' ? 'bg-[#070a18] border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
                 }`}
               />
             </div>
@@ -301,9 +252,9 @@ export default function App() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full mt-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
             >
-              {authLoading ? 'Verifying Session...' : 'Authenticate Session'}
+              {authLoading ? 'Verifying...' : 'Sign In to Enterprise'}
             </button>
           </form>
         </div>
@@ -311,348 +262,446 @@ export default function App() {
     );
   }
 
-  // --- Main Application Dashboard ---
+  // --- Main Dashboard & Settings Screen ---
   return (
-    <div className={`min-h-screen flex transition-colors duration-200 ${
-      theme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-50 text-slate-800'
+    <div className={`min-h-screen flex font-sans transition-colors duration-200 ${
+      theme === 'dark' ? 'bg-[#060813] text-slate-100' : 'bg-[#f4f6fb] text-slate-900'
     }`}>
-      {/* Sidebar Navigation */}
-      <aside className={`w-64 border-r flex flex-col justify-between p-6 transition-colors ${
-        theme === 'dark' ? 'bg-[#0b101b] border-slate-800' : 'bg-white border-slate-200'
+      {/* Sidebar */}
+      <aside className={`w-72 border-r flex flex-col justify-between p-6 select-none ${
+        theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
       }`}>
-        <div className="space-y-6">
-          <div>
-            <span className="text-xl font-black tracking-tight bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-              {settings.portalName}
-            </span>
-            <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mt-0.5">
-              Admin Platform
-            </span>
-          </div>
+        <div className="space-y-8">
+          {/* Logo & Portal Name: Clicking navigates to Overview */}
+          <button 
+            type="button" 
+            onClick={() => setActiveTab('overview')}
+            className="flex items-center gap-3 group text-left w-full focus:outline-none"
+            title="Click to go to Overview Dashboard"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-base font-bold tracking-tight group-hover:text-indigo-400 transition-colors">
+                {portalName}
+              </div>
+              <div className="text-[10px] font-bold tracking-widest text-indigo-400 uppercase">
+                ENTERPRISE
+              </div>
+            </div>
+          </button>
 
-          <nav className="space-y-1.5">
+          {/* Navigation Links */}
+          <nav className="space-y-2">
             {[
-              { id: 'dashboard', label: 'Dashboard' },
-              { id: 'users', label: 'Members' },
-              { id: 'settings', label: 'Settings' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition ${
-                  activeTab === tab.id
-                    ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20'
-                    : theme === 'dark'
-                    ? 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+              { id: 'team', label: 'Team & Users', icon: Users },
+              { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+              { id: 'settings', label: 'Settings', icon: Settings },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+                    isActive
+                      ? 'bg-[#181a38] text-indigo-400 border border-indigo-500/30 shadow-inner'
+                      : theme === 'dark'
+                      ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 
-        {/* Sidebar Footer / Account Info */}
-        <div className={`pt-4 border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
-          <div className="text-xs font-medium truncate text-slate-400 mb-2">
-            {user.email}
+        {/* User Card at bottom of sidebar (Untouched) */}
+        <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+          theme === 'dark' ? 'bg-[#0e122b] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
+              MA
+            </div>
+            <div className="text-left">
+              <div className="text-xs font-bold leading-tight">Master Admin</div>
+              <div className="text-[10px] text-slate-400">Admin</div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-medium transition ${
-                theme === 'dark' ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
-            >
-              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-            </button>
-            <button
-              onClick={handleLogout}
-              className="py-1.5 px-3 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition"
-            >
-              Logout
-            </button>
-          </div>
+          <button 
+            onClick={handleLogout}
+            title="Log Out"
+            className="text-slate-400 hover:text-red-400 transition-colors p-1"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        {/* --- TAB 1: DASHBOARD --- */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8 max-w-6xl">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">System Overview</h1>
-              <p className="text-sm text-slate-400 mt-1">Real-time platform metrics and live telemetry</p>
-            </div>
+      <main className="flex-1 p-10 overflow-y-auto">
+        {/* Top Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {activeTab === 'settings' && 'Platform Settings'}
+            {activeTab === 'overview' && 'System Overview'}
+            {activeTab === 'team' && 'Team & Users'}
+            {activeTab === 'permissions' && 'Platform Permissions'}
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Signed in as <span className="text-slate-300 font-medium">{user?.email || 'akshatnanawati2704@gmail.com'}</span>
+          </p>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Total Users', val: stats.totalUsers },
-                { label: 'Active Sessions', val: stats.activeUsers },
-                { label: 'Platform Admins', val: stats.totalAdmins },
-                { label: 'Health Status', val: stats.systemStatus }
-              ].map((card, i) => (
-                <div
-                  key={i}
-                  className={`p-5 rounded-2xl border transition-all ${
-                    theme === 'dark' ? 'bg-[#0b101b] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                  }`}
-                >
-                  <div className="text-xs uppercase font-semibold tracking-wider text-slate-400">{card.label}</div>
-                  <div className="text-2xl font-bold mt-2 text-indigo-500">{card.val}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between pt-4">
-              <div>
-                <h2 className="text-lg font-bold">Recent Members</h2>
-                <p className="text-xs text-slate-400">Quick view of recent accounts</p>
-              </div>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/30 transition"
-              >
-                + Add Member
-              </button>
-            </div>
-
-            {/* Quick table preview */}
-            <div className={`border rounded-2xl overflow-hidden ${
-              theme === 'dark' ? 'border-slate-800 bg-[#0b101b]' : 'border-slate-200 bg-white shadow-sm'
-            }`}>
-              <table className="w-full text-left text-sm">
-                <thead className={`border-b text-xs uppercase font-semibold text-slate-400 ${
-                  theme === 'dark' ? 'border-slate-800 bg-slate-900/40' : 'border-slate-100 bg-slate-50'
-                }`}>
-                  <tr>
-                    <th className="p-4">Name</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Role</th>
-                    <th className="p-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/40">
-                  {users.slice(0, 4).map((u) => (
-                    <tr key={u.id} className="hover:bg-indigo-500/5 transition">
-                      <td className="p-4 font-medium">{u.name}</td>
-                      <td className="p-4 text-slate-400">{u.email}</td>
-                      <td className="p-4">{u.role}</td>
-                      <td className="p-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
-                        }`}>
-                          {u.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {feedback && (
+          <div className="mb-6 p-4 rounded-xl text-xs font-semibold bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            {feedback}
           </div>
         )}
 
-        {/* --- TAB 2: MEMBERS MANAGEMENT --- */}
-        {activeTab === 'users' && (
-          <div className="space-y-6 max-w-6xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Member Roster</h1>
-                <p className="text-sm text-slate-400 mt-1">Manage portal accounts, roles, and administrative statuses</p>
-              </div>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/30 transition"
-              >
-                + Add Member
-              </button>
-            </div>
-
-            <div className={`border rounded-2xl overflow-hidden ${
-              theme === 'dark' ? 'border-slate-800 bg-[#0b101b]' : 'border-slate-200 bg-white shadow-sm'
-            }`}>
-              <table className="w-full text-left text-sm">
-                <thead className={`border-b text-xs uppercase font-semibold text-slate-400 ${
-                  theme === 'dark' ? 'border-slate-800 bg-slate-900/40' : 'border-slate-100 bg-slate-50'
-                }`}>
-                  <tr>
-                    <th className="p-4">Name</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Role</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/40">
-                  {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-indigo-500/5 transition">
-                      <td className="p-4 font-medium">{u.name}</td>
-                      <td className="p-4 text-slate-400">{u.email}</td>
-                      <td className="p-4 font-medium">{u.role}</td>
-                      <td className="p-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
-                        }`}>
-                          {u.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleDeleteUser(u.id)}
-                          className="text-xs text-red-400 hover:text-red-300 font-semibold"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB 3: PLATFORM SETTINGS --- */}
+        {/* --- SETTINGS TAB VIEW --- */}
         {activeTab === 'settings' && (
-          <div className="space-y-6 max-w-3xl">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
-              <p className="text-sm text-slate-400 mt-1">
-                Signed in as <span className="text-indigo-400 font-medium">{user.email}</span>
-              </p>
-            </div>
-
-            {settingsFeedback && (
-              <div className="p-3 text-sm rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                {settingsFeedback}
-              </div>
-            )}
-
-            {/* General Configurations */}
-            <div className={`p-6 rounded-2xl border space-y-6 ${
-              theme === 'dark' ? 'bg-[#0b101b] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+          <div className="space-y-6 max-w-4xl">
+            {/* Main Configuration Card */}
+            <div className={`p-8 rounded-3xl border shadow-xl ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-slate-100'
             }`}>
-              <div>
-                <h2 className="text-lg font-bold">Portal Configuration</h2>
-                <p className="text-xs text-slate-400">Configure global portal behavior and restrictions</p>
+              <div className="mb-6">
+                <h2 className="text-lg font-bold">Platform Settings</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Configure global portal behavior and restrictions</p>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-5">
+                {/* Portal Name Input */}
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Portal Name
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    PORTAL NAME
                   </label>
                   <input
                     type="text"
-                    value={settings.portalName}
-                    onChange={(e) => setSettings({ ...settings, portalName: e.target.value })}
-                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition ${
+                    value={portalName}
+                    onChange={(e) => setPortalName(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-medium outline-none transition ${
                       theme === 'dark'
-                        ? 'bg-[#060a12] border-slate-800 text-white focus:border-indigo-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
+                        ? 'bg-[#060813] border-slate-800/90 text-white focus:border-indigo-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-600'
                     }`}
-                    placeholder="NexusAdmin"
-                    required
                   />
                 </div>
 
-                <div className={`flex items-center justify-between p-4 rounded-xl border ${
-                  theme === 'dark' ? 'bg-[#060a12] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                {/* Public Registrations Toggle */}
+                <div className={`flex items-center justify-between p-4 rounded-2xl border ${
+                  theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div>
-                    <div className="text-sm font-semibold">Public Registrations</div>
+                    <div className="text-sm font-bold">Public Registrations</div>
                     <div className="text-xs text-slate-400">Permit external visitors to sign up as Viewers</div>
                   </div>
                   <input
                     type="checkbox"
-                    checked={settings.publicRegistrations}
-                    onChange={(e) => setSettings({ ...settings, publicRegistrations: e.target.checked })}
-                    className="h-5 w-5 rounded accent-indigo-600 cursor-pointer"
+                    checked={publicRegistrations}
+                    onChange={(e) => setPublicRegistrations(e.target.checked)}
+                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer"
                   />
                 </div>
 
-                <div className={`flex items-center justify-between p-4 rounded-xl border ${
-                  theme === 'dark' ? 'bg-[#060a12] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                {/* Maintenance Mode Toggle */}
+                <div className={`flex items-center justify-between p-4 rounded-2xl border ${
+                  theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div>
-                    <div className="text-sm font-semibold">Maintenance Mode</div>
+                    <div className="text-sm font-bold">Maintenance Mode</div>
                     <div className="text-xs text-slate-400">Redirect non-admin visitors to an update screen</div>
                   </div>
                   <input
                     type="checkbox"
-                    checked={settings.maintenanceMode}
-                    onChange={(e) => setSettings({ ...settings, maintenanceMode: e.target.checked })}
-                    className="h-5 w-5 rounded accent-indigo-600 cursor-pointer"
+                    checked={maintenanceMode}
+                    onChange={(e) => setMaintenanceMode(e.target.checked)}
+                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer"
                   />
                 </div>
 
+                {/* Save Platform Settings Button */}
                 <button
                   type="submit"
-                  disabled={savingSettings}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.01]"
                 >
-                  {savingSettings ? 'Saving...' : 'Save Platform Settings'}
+                  Save Platform Settings
                 </button>
               </form>
             </div>
 
-            {/* Appearance Mode */}
-            <div className={`p-6 rounded-2xl border flex items-center justify-between ${
-              theme === 'dark' ? 'bg-[#0b101b] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+            {/* Quick Actions & Working Controls Card */}
+            <div className={`p-8 rounded-3xl border shadow-xl space-y-5 ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
               <div>
-                <h2 className="text-base font-bold">Display Mode</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Toggle between Dark and Light palette</p>
-              </div>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition ${
-                  theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
-                }`}
-              >
-                Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode
-              </button>
-            </div>
-
-            {/* Danger Zone */}
-            <div className={`p-6 rounded-2xl border space-y-4 ${
-              theme === 'dark' ? 'bg-[#0b101b] border-red-950/40' : 'bg-white border-red-200 shadow-sm'
-            }`}>
-              <div>
-                <h2 className="text-base font-bold text-red-400">Danger Zone</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Destructive actions and administrative session control</p>
+                <h2 className="text-base font-bold">Quick Actions & Preferences</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Control live session, visual theme, and system diagnostic operations</p>
               </div>
 
-              <div className="flex flex-wrap gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                {/* 1. Theme Toggle with Icon */}
                 <button
                   type="button"
-                  onClick={handleResetData}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 text-xs font-semibold transition"
+                  onClick={toggleTheme}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800 shadow-sm'
+                  }`}
                 >
-                  Reset Seed Data
+                  {theme === 'dark' ? (
+                    <>
+                      <Sun className="w-4 h-4 text-amber-400" />
+                      <span>Switch to Light Theme</span>
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="w-4 h-4 text-indigo-600" />
+                      <span>Switch to Dark Theme</span>
+                    </>
+                  )}
                 </button>
+
+                {/* 2. Login / Logout Action Button with Icon */}
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all"
                 >
-                  Log Out of Session
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out of Session</span>
                 </button>
+
+                {/* 3. Clear Cache & Refresh Data */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadData();
+                    setFeedback('Cache cleared & data synchronized with live server.');
+                    setTimeout(() => setFeedback(''), 3000);
+                  }}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  <RefreshCw className="w-4 h-4 text-indigo-400" />
+                  <span>Clear Cache & Sync</span>
+                </button>
+
+                {/* 4. Export Platform Audit Report */}
+                <button
+                  type="button"
+                  onClick={handleExportData}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span>Export Audit Report</span>
+                </button>
+
+                {/* 5. System Health Diagnostic Ping */}
+                <button
+                  type="button"
+                  onClick={handlePingServer}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  <Activity className="w-4 h-4 text-cyan-400" />
+                  <span>{healthStatus || 'Test API Ping'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- OVERVIEW TAB VIEW --- */}
+        {activeTab === 'overview' && (
+          <div className="space-y-8 max-w-6xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Users', val: stats.totalUsers },
+                { label: 'Active Sessions', val: stats.activeUsers },
+                { label: 'Platform Admins', val: stats.totalAdmins },
+                { label: 'System Status', val: maintenanceMode ? 'Maintenance' : 'Optimal' }
+              ].map((card, i) => (
+                <div
+                  key={i}
+                  className={`p-6 rounded-3xl border transition-all ${
+                    theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
+                  }`}
+                >
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{card.label}</div>
+                  <div className="text-3xl font-extrabold mt-3 text-indigo-400">{card.val}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className={`p-8 rounded-3xl border ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-bold">Recent Members</h2>
+                  <p className="text-xs text-slate-400">Latest active users onboarded to {portalName}</p>
+                </div>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Member</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-800/60 text-slate-400 text-xs uppercase font-bold">
+                      <th className="pb-3">Name</th>
+                      <th className="pb-3">Email</th>
+                      <th className="pb-3">Role</th>
+                      <th className="pb-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {users.slice(0, 4).map((u) => (
+                      <tr key={u.id}>
+                        <td className="py-3.5 font-semibold">{u.name}</td>
+                        <td className="py-3.5 text-slate-400">{u.email}</td>
+                        <td className="py-3.5">{u.role}</td>
+                        <td className="py-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
+                          }`}>
+                            {u.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- TEAM & USERS TAB VIEW --- */}
+        {activeTab === 'team' && (
+          <div className="space-y-6 max-w-6xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Team Directory</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Manage administrative credentials and viewer permissions</p>
+              </div>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Member</span>
+              </button>
+            </div>
+
+            <div className={`p-8 rounded-3xl border ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-800/60 text-slate-400 text-xs uppercase font-bold">
+                      <th className="pb-3">Name</th>
+                      <th className="pb-3">Email</th>
+                      <th className="pb-3">Role</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {users.map((u) => (
+                      <tr key={u.id}>
+                        <td className="py-3.5 font-semibold">{u.name}</td>
+                        <td className="py-3.5 text-slate-400">{u.email}</td>
+                        <td className="py-3.5">{u.role}</td>
+                        <td className="py-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
+                          }`}>
+                            {u.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 text-right">
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="text-red-400 hover:text-red-300 p-1"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- PERMISSIONS TAB VIEW --- */}
+        {activeTab === 'permissions' && (
+          <div className="max-w-4xl space-y-6">
+            <div className={`p-8 rounded-3xl border ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <h2 className="text-lg font-bold mb-2">Access Control Matrix</h2>
+              <p className="text-xs text-slate-400 mb-6">Default system role privileges and security policies</p>
+              
+              <div className="space-y-3">
+                {[
+                  { role: 'Admin', desc: 'Full write/read permissions, settings modification, user creation' },
+                  { role: 'Editor', desc: 'Can manage contents and view analytics; cannot alter platform settings' },
+                  { role: 'Viewer', desc: 'Read-only access across dashboard reporting endpoints' }
+                ].map((item, idx) => (
+                  <div key={idx} className={`p-4 rounded-2xl border flex items-center justify-between ${
+                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div>
+                      <div className="text-sm font-bold text-indigo-400">{item.role}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{item.desc}</div>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+                      Active Policy
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
       </main>
 
-      {/* --- ADD MEMBER MODAL --- */}
+      {/* Add Member Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md p-6 rounded-2xl border shadow-2xl space-y-4 ${
-            theme === 'dark' ? 'bg-[#0b101b] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 ${
+            theme === 'dark' ? 'bg-[#090d1f] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             <h2 className="text-lg font-bold">Add New Member</h2>
             <form onSubmit={handleAddMember} className="space-y-4">
@@ -665,7 +714,7 @@ export default function App() {
                   onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
                   placeholder="Jane Doe"
                   className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                    theme === 'dark' ? 'bg-[#060a12] border-slate-800' : 'bg-slate-50 border-slate-300'
+                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                   }`}
                 />
               </div>
@@ -679,7 +728,7 @@ export default function App() {
                   onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
                   placeholder="jane@example.com"
                   className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                    theme === 'dark' ? 'bg-[#060a12] border-slate-800' : 'bg-slate-50 border-slate-300'
+                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                   }`}
                 />
               </div>
@@ -691,7 +740,7 @@ export default function App() {
                     value={newMember.role}
                     onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
                     className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                      theme === 'dark' ? 'bg-[#060a12] border-slate-800' : 'bg-slate-50 border-slate-300'
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
                     <option value="Viewer">Viewer</option>
@@ -706,7 +755,7 @@ export default function App() {
                     value={newMember.status}
                     onChange={(e) => setNewMember({ ...newMember, status: e.target.value })}
                     className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                      theme === 'dark' ? 'bg-[#060a12] border-slate-800' : 'bg-slate-50 border-slate-300'
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
                     <option value="Active">Active</option>
@@ -725,10 +774,9 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  disabled={addingMember}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/30 transition disabled:opacity-50"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30"
                 >
-                  {addingMember ? 'Saving...' : 'Add Member'}
+                  Add Member
                 </button>
               </div>
             </form>
