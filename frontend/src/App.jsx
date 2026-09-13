@@ -11,13 +11,12 @@ import {
   Download, 
   Activity, 
   Check, 
-  Sparkles, 
-  ExternalLink, 
   Trash2, 
   Plus, 
   Search, 
   Menu, 
-  X 
+  X,
+  ExternalLink
 } from 'lucide-react';
 
 const API_BASE_URL = (
@@ -69,6 +68,7 @@ export default function App() {
   const [newStudent, setNewStudent] = useState({
     name: '',
     email: '',
+    rollNo: '',
     role: 'BCA',
     status: 'Enrolled'
   });
@@ -81,6 +81,9 @@ export default function App() {
     dept: 'Department of Computing',
     head: ''
   });
+
+  // Helper to check if role is staff
+  const isStaffRole = (role) => role === 'Admin' || role === 'Teacher';
 
   // Apply Theme
   useEffect(() => {
@@ -196,6 +199,7 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setCourses(courses.filter((c) => c.id !== id));
+        if (selectedFilter === code) setSelectedFilter('All');
         loadData();
       }
     } catch (err) {
@@ -207,13 +211,21 @@ export default function App() {
   const handleProvisionUser = async (e) => {
     e.preventDefault();
     try {
+      const isStaff = isStaffRole(newStudent.role);
+      
+      // If staff (Admin/Teacher), assign empty or null rollNo. Otherwise use manual input or fallback.
+      let finalRollNo = '';
+      if (!isStaff) {
+        finalRollNo = newStudent.rollNo.trim() || `CS-2026-${Math.floor(10 + Math.random() * 90)}`;
+      }
+
       const payload = {
         name: newStudent.name,
         email: newStudent.email,
         role: newStudent.role,
         course: newStudent.role,
         status: newStudent.status,
-        rollNo: `CS-2026-${Math.floor(10 + Math.random() * 90)}`
+        rollNo: finalRollNo
       };
 
       const res = await fetch(`${API_BASE_URL}/students`, {
@@ -226,7 +238,7 @@ export default function App() {
       if (res.ok) {
         setStudents([data, ...students]);
         setShowAddModal(false);
-        setNewStudent({ name: '', email: '', role: courses[0]?.code || 'BCA', status: 'Enrolled' });
+        setNewStudent({ name: '', email: '', rollNo: '', role: courses[0]?.code || 'BCA', status: 'Enrolled' });
         loadData();
       }
     } catch (err) {
@@ -310,7 +322,7 @@ export default function App() {
       const matchesSearch = 
         s.name?.toLowerCase().includes(query) ||
         s.email?.toLowerCase().includes(query) ||
-        s.rollNo?.toLowerCase().includes(query);
+        (s.rollNo && s.rollNo.toLowerCase().includes(query));
       
       let matchesFilter = true;
       if (selectedFilter !== 'All') {
@@ -580,7 +592,13 @@ export default function App() {
                   <tbody className="divide-y divide-slate-800/40">
                     {students.slice(0, 4).map((s) => (
                       <tr key={s.id}>
-                        <td className="py-3 px-2 font-mono text-indigo-400">{s.rollNo || `CS-2026-${s.id}`}</td>
+                        <td className="py-3 px-2 font-mono text-indigo-400">
+                          {isStaffRole(s.role) ? (
+                            <span className="text-slate-500 text-xs">STAFF</span>
+                          ) : (
+                            s.rollNo || `CS-2026-${s.id}`
+                          )}
+                        </td>
                         <td className="py-3 px-2 font-semibold">
                           {s.name}
                           <div className="text-[11px] text-slate-400 font-normal">{s.email}</div>
@@ -690,7 +708,13 @@ export default function App() {
                     ) : (
                       filteredStudents.map((s) => (
                         <tr key={s.id}>
-                          <td className="py-3 px-2 font-mono text-indigo-400">{s.rollNo || `CS-2026-${s.id}`}</td>
+                          <td className="py-3 px-2 font-mono text-indigo-400">
+                            {isStaffRole(s.role) ? (
+                              <span className="text-slate-500 text-xs italic tracking-wider">STAFF</span>
+                            ) : (
+                              s.rollNo || `CS-2026-${s.id}`
+                            )}
+                          </td>
                           <td className="py-3 px-2 font-semibold">
                             {s.name}
                             <div className="text-[11px] text-slate-400 font-normal">{s.email}</div>
@@ -1058,10 +1082,11 @@ export default function App() {
 
             <div className="mb-6">
               <h2 className="text-xl font-bold tracking-tight text-white">Provision New User</h2>
-              <p className="text-xs text-slate-400 mt-1">Assign directory privileges and account states</p>
+              <p className="text-xs text-slate-400 mt-1">Assign directory privileges and student details</p>
             </div>
 
             <form onSubmit={handleProvisionUser} className="space-y-4">
+              {/* Display Name */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                   DISPLAY NAME
@@ -1076,6 +1101,7 @@ export default function App() {
                 />
               </div>
 
+              {/* Email Address */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                   EMAIL ADDRESS
@@ -1090,8 +1116,9 @@ export default function App() {
                 />
               </div>
 
+              {/* Role and Status Dropdown Row */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Dropdown 1: Role / Multiple Courses & Degrees (Editor and Viewer removed) */}
+                {/* Dropdown 1: Role / Degree */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     ROLE / DEGREE
@@ -1121,7 +1148,7 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Dropdown 2: Status (Strictly Enrolled, Active, On Leave) */}
+                {/* Dropdown 2: Status */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     STATUS
@@ -1144,7 +1171,26 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-4 pt-6">
+              {/* Manual Roll Number Field (Hidden or Disabled if Admin/Teacher) */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  ROLL NUMBER {isStaffRole(newStudent.role) ? '(NOT APPLICABLE FOR STAFF)' : '(CUSTOM ASSIGNMENT)'}
+                </label>
+                <input
+                  type="text"
+                  disabled={isStaffRole(newStudent.role)}
+                  value={isStaffRole(newStudent.role) ? 'N/A (Staff Role)' : newStudent.rollNo}
+                  onChange={(e) => setNewStudent({ ...newStudent, rollNo: e.target.value })}
+                  placeholder="e.g. CS-2026-05 or 24BCA101"
+                  className={`w-full px-4 py-3 rounded-xl border text-sm transition outline-none ${
+                    isStaffRole(newStudent.role)
+                      ? 'bg-slate-900/50 border-slate-800/40 text-slate-600 cursor-not-allowed italic'
+                      : 'bg-[#060813] border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 font-mono'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-4 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
