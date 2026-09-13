@@ -9,11 +9,22 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Your custom credentials from .env (with safe fallbacks)
-const CUSTOM_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@nexus.com';
-const CUSTOM_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const CUSTOM_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'akshatnanawati2704@gmail.com';
+const CUSTOM_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin2704';
 
-app.use(cors());
+// Enable CORS for all incoming origins and methods
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
+
+// Root healthcheck route
+app.get('/', (req, res) => {
+  res.send({ status: 'API is healthy and online' });
+});
 
 // In-Memory Data Store
 let users = [
@@ -23,8 +34,8 @@ let users = [
   { id: '4', name: 'Sneha Patel', email: 'sneha@example.com', role: 'Editor', status: 'Active', joinedAt: '2025-04-10' }
 ];
 
-// --- AUTH ROUTE: Custom Login ---
-app.post('/api/auth/login', (req, res) => {
+// Helper login handler
+const handleLogin = (req, res) => {
   const { email, password } = req.body;
 
   if (email === CUSTOM_ADMIN_EMAIL && password === CUSTOM_ADMIN_PASSWORD) {
@@ -40,7 +51,11 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   return res.status(401).json({ error: 'Invalid custom credentials. Please check your email and password.' });
-});
+};
+
+// Accept login at both /api/auth/login AND /api/login to prevent path mismatches
+app.post('/api/auth/login', handleLogin);
+app.post('/api/login', handleLogin);
 
 // Dashboard Statistics
 app.get('/api/stats', (req, res) => {
@@ -111,5 +126,5 @@ app.delete('/api/users/:id', (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
