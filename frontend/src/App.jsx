@@ -62,8 +62,6 @@ export default function App() {
   ]);
   const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 4, systemStatus: 'Academic Term Active' });
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Updated Active Filter Pill State
   const [selectedFilter, setSelectedFilter] = useState('All');
 
   // Modals
@@ -71,7 +69,7 @@ export default function App() {
   const [newStudent, setNewStudent] = useState({
     name: '',
     email: '',
-    role: 'Teacher',
+    role: 'BCA',
     status: 'Enrolled'
   });
 
@@ -130,7 +128,7 @@ export default function App() {
     }
   };
 
-  // Auth
+  // Auth Handlers
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -228,7 +226,7 @@ export default function App() {
       if (res.ok) {
         setStudents([data, ...students]);
         setShowAddModal(false);
-        setNewStudent({ name: '', email: '', role: 'Teacher', status: 'Enrolled' });
+        setNewStudent({ name: '', email: '', role: courses[0]?.code || 'BCA', status: 'Enrolled' });
         loadData();
       }
     } catch (err) {
@@ -305,7 +303,7 @@ export default function App() {
     }
   };
 
-  // Filter List (Matches ALL, ADMIN, TEACHER, ENROLLED, ON LEAVE)
+  // Filter List (ALL, ADMIN, TEACHER, ENROLLED, ON LEAVE)
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
       const query = searchQuery.toLowerCase();
@@ -592,9 +590,7 @@ export default function App() {
                           <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
                             s.status === 'Enrolled' || s.status === 'Active' 
                               ? 'bg-emerald-500/10 text-emerald-400' 
-                              : s.status === 'On Leave' || s.status === 'Inactive' 
-                              ? 'bg-amber-500/10 text-amber-400' 
-                              : 'bg-indigo-500/10 text-indigo-400'
+                              : 'bg-amber-500/10 text-amber-400'
                           }`}>
                             {s.status}
                           </span>
@@ -608,7 +604,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 2: STUDENT ROSTER (UPDATED FILTER BAR) --- */}
+        {/* --- TAB 2: STUDENT ROSTER --- */}
         {activeTab === 'students' && (
           <div className="space-y-6 max-w-6xl pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -679,7 +675,7 @@ export default function App() {
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
                       <th className="pb-3 px-2">Roll No</th>
                       <th className="pb-3 px-2">User / Student</th>
-                      <th className="pb-3 px-2">Role</th>
+                      <th className="pb-3 px-2">Role / Program</th>
                       <th className="pb-3 px-2">Status</th>
                       <th className="pb-3 px-2 text-right">Action</th>
                     </tr>
@@ -704,9 +700,7 @@ export default function App() {
                             <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
                               s.status === 'Enrolled' || s.status === 'Active' 
                                 ? 'bg-emerald-500/10 text-emerald-400' 
-                                : s.status === 'On Leave' || s.status === 'Inactive' 
-                                ? 'bg-amber-500/10 text-amber-400' 
-                                : 'bg-indigo-500/10 text-indigo-400'
+                                : 'bg-amber-500/10 text-amber-400'
                             }`}>
                               {s.status}
                             </span>
@@ -1097,10 +1091,10 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Role / Type Dropdown */}
+                {/* Dropdown 1: Role / Multiple Courses & Degrees (Editor and Viewer removed) */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    ROLE
+                    ROLE / DEGREE
                   </label>
                   <select
                     value={newStudent.role}
@@ -1113,13 +1107,21 @@ export default function App() {
                       backgroundSize: '1em'
                     }}
                   >
-                    <option value="Admin" className="bg-[#0c1021]">Admin</option>
-                    <option value="Teacher" className="bg-[#0c1021]">Teacher</option>
-                    <option value="Student" className="bg-[#0c1021]">Student</option>
+                    <optgroup label="Academic Degrees / Programs" className="bg-[#0c1021] text-indigo-400 font-semibold">
+                      {courses.map((c) => (
+                        <option key={c.id} value={c.code} className="bg-[#0c1021] text-slate-100 font-normal">
+                          {c.code} ({c.name})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Staff & Administration" className="bg-[#0c1021] text-indigo-400 font-semibold">
+                      <option value="Admin" className="bg-[#0c1021] text-slate-100 font-normal">Admin</option>
+                      <option value="Teacher" className="bg-[#0c1021] text-slate-100 font-normal">Teacher</option>
+                    </optgroup>
                   </select>
                 </div>
 
-                {/* Status Dropdown */}
+                {/* Dropdown 2: Status (Strictly Enrolled, Active, On Leave) */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     STATUS
@@ -1136,9 +1138,8 @@ export default function App() {
                     }}
                   >
                     <option value="Enrolled" className="bg-[#0c1021]">Enrolled</option>
-                    <option value="On Leave" className="bg-[#0c1021]">On Leave</option>
                     <option value="Active" className="bg-[#0c1021]">Active</option>
-                    <option value="Inactive" className="bg-[#0c1021]">Inactive</option>
+                    <option value="On Leave" className="bg-[#0c1021]">On Leave</option>
                   </select>
                 </div>
               </div>
