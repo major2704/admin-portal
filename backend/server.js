@@ -21,108 +21,120 @@ app.use(express.json());
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ status: 'API is healthy and online' });
+  res.json({ status: 'EduNexus SMS API is online and healthy' });
 });
 
-// Initial seed data
-const initialUsers = [
-  { id: '1', name: 'Aarav Sharma', email: 'aarav@example.com', role: 'Admin', status: 'Active', joinedAt: '2025-01-12' },
-  { id: '2', name: 'Pooja Verma', email: 'pooja@example.com', role: 'Editor', status: 'Active', joinedAt: '2025-02-04' },
-  { id: '3', name: 'Rohan Mehta', email: 'rohan@example.com', role: 'Viewer', status: 'Inactive', joinedAt: '2025-03-18' },
-  { id: '4', name: 'Sneha Patel', email: 'sneha@example.com', role: 'Editor', status: 'Active', joinedAt: '2025-04-10' }
+// Initial Student Seed Data
+const initialStudents = [
+  { id: '1', rollNo: 'CS-2026-01', name: 'Aarav Sharma', email: 'aarav.sharma@campus.edu', course: 'BCA', year: '3rd Year', status: 'Enrolled', joinedAt: '2025-01-12' },
+  { id: '2', rollNo: 'CS-2026-02', name: 'Pooja Verma', email: 'pooja.verma@campus.edu', course: 'BCA', year: '2nd Year', status: 'Enrolled', joinedAt: '2025-02-04' },
+  { id: '3', rollNo: 'CS-2026-03', name: 'Rohan Mehta', email: 'rohan.mehta@campus.edu', course: 'B.Tech CS', year: '1st Year', status: 'On Leave', joinedAt: '2025-03-18' },
+  { id: '4', rollNo: 'CS-2026-04', name: 'Sneha Patel', email: 'sneha.patel@campus.edu', course: 'MCA', year: '1st Year', status: 'Enrolled', joinedAt: '2025-04-10' }
 ];
 
-// In-Memory Data Store
-let users = [...initialUsers];
+// In-Memory Data Stores
+let students = [...initialStudents];
 
-// In-Memory Platform Settings Store
 let platformSettings = {
-  portalName: 'NexusAdmin',
-  publicRegistrations: false,
-  maintenanceMode: false,
+  portalName: 'EduNexus SMS',
+  publicRegistrations: true, // Student self-enrollment toggle
+  maintenanceMode: false,     // Semester grade freeze toggle
   theme: 'dark'
 };
 
-// Handlers
+// --- Handlers ---
+
+// Admin Authentication
 const handleLogin = (req, res) => {
   const { email, password } = req.body;
   if (email === CUSTOM_ADMIN_EMAIL && password === CUSTOM_ADMIN_PASSWORD) {
     return res.json({
-      token: 'nexus_secure_token_' + Date.now(),
+      token: 'edunexus_auth_token_' + Date.now(),
       user: {
         id: '0',
-        name: 'Master Admin',
+        name: 'Dean / Master Admin',
         email: CUSTOM_ADMIN_EMAIL,
         role: 'Admin'
       }
     });
   }
-  return res.status(401).json({ error: 'Invalid email or password.' });
+  return res.status(401).json({ error: 'Invalid admin email or password.' });
 };
 
+// Academic System Statistics
 const handleGetStats = (req, res) => {
-  const totalUsers = users.length;
-  const activeUsers = users.filter(u => u.status === 'Active').length;
-  const totalAdmins = users.filter(u => u.role === 'Admin').length;
+  const totalStudents = students.length;
+  const activeUsers = students.filter(s => s.status === 'Enrolled').length;
+  const totalCourses = new Set(students.map(s => s.course)).size;
 
   res.json({
-    totalUsers,
-    activeUsers,
-    totalAdmins,
-    systemStatus: platformSettings.maintenanceMode ? 'Maintenance' : 'Optimal'
+    totalUsers: totalStudents,
+    activeUsers: activeUsers,
+    totalAdmins: totalCourses, // Reflects distinct academic departments/courses
+    systemStatus: platformSettings.maintenanceMode ? 'Semester Freeze' : 'Academic Term Active'
   });
 };
 
-const handleGetUsers = (req, res) => {
-  res.json(users);
+// Fetch Student Directory
+const handleGetStudents = (req, res) => {
+  res.json(students);
 };
 
-const handleCreateUser = (req, res) => {
-  const { name, email, role, status } = req.body;
+// Enroll / Add New Student
+const handleCreateStudent = (req, res) => {
+  const { name, email, rollNo, course, year, role, status } = req.body;
   if (!name || !email) {
-    return res.status(400).json({ error: 'Name and email are required.' });
+    return res.status(400).json({ error: 'Student name and email are required.' });
   }
 
-  const newUser = {
+  const newStudent = {
     id: Date.now().toString(),
+    rollNo: rollNo || `CS-${new Date().getFullYear()}-${Math.floor(10 + Math.random() * 90)}`,
     name,
     email,
-    role: role || 'Viewer',
-    status: status || 'Active',
+    course: course || role || 'BCA',
+    year: year || '1st Year',
+    role: course || role || 'BCA', // Kept for backward compatibility with frontend tables
+    status: status || 'Enrolled',
     joinedAt: new Date().toISOString().split('T')[0]
   };
 
-  users.unshift(newUser);
-  res.status(201).json(newUser);
+  students.unshift(newStudent);
+  res.status(201).json(newStudent);
 };
 
-const handleUpdateUser = (req, res) => {
+// Update Student Record
+const handleUpdateStudent = (req, res) => {
   const { id } = req.params;
-  const { name, email, role, status } = req.body;
+  const { name, email, rollNo, course, year, role, status } = req.body;
 
-  const index = users.findIndex(u => u.id === id);
+  const index = students.findIndex(s => s.id === id);
   if (index === -1) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: 'Student record not found.' });
   }
 
-  users[index] = {
-    ...users[index],
-    name: name ?? users[index].name,
-    email: email ?? users[index].email,
-    role: role ?? users[index].role,
-    status: status ?? users[index].status
+  students[index] = {
+    ...students[index],
+    name: name ?? students[index].name,
+    email: email ?? students[index].email,
+    rollNo: rollNo ?? students[index].rollNo,
+    course: course ?? role ?? students[index].course,
+    year: year ?? students[index].year,
+    role: course ?? role ?? students[index].role,
+    status: status ?? students[index].status
   };
 
-  res.json(users[index]);
+  res.json(students[index]);
 };
 
-const handleDeleteUser = (req, res) => {
+// Remove / Drop Student
+const handleDeleteStudent = (req, res) => {
   const { id } = req.params;
-  users = users.filter(u => u.id !== id);
-  res.json({ message: 'User deleted successfully.' });
+  students = students.filter(s => s.id !== id);
+  res.json({ message: 'Student record removed successfully.' });
 };
 
-// Platform Settings Handlers
+// Platform & Academic Settings Handlers
 const handleGetSettings = (req, res) => {
   res.json(platformSettings);
 };
@@ -138,48 +150,56 @@ const handleUpdateSettings = (req, res) => {
   };
 
   res.json({
-    message: 'Settings updated successfully',
+    message: 'Academic platform settings updated successfully.',
     settings: platformSettings
   });
 };
 
-// Reset In-Memory Data Handler (Danger Zone utility)
+// Reset In-Memory Records to Defaults
 const handleResetData = (req, res) => {
-  users = [...initialUsers];
+  students = [...initialStudents];
   platformSettings = {
-    portalName: 'NexusAdmin',
-    publicRegistrations: false,
+    portalName: 'EduNexus SMS',
+    publicRegistrations: true,
     maintenanceMode: false,
     theme: 'dark'
   };
-  res.json({ message: 'Database and settings reset to defaults.' });
+  res.json({ message: 'Student database and academic settings reset to factory defaults.' });
 };
 
-// --- Routes (Registered for both with and without '/api') ---
+// --- Route Registrations (Both /api and root paths) ---
 
 // Auth
 app.post('/api/auth/login', handleLogin);
 app.post('/api/login', handleLogin);
 app.post('/auth/login', handleLogin);
 
-// Stats
+// Academic Telemetry & Statistics
 app.get('/api/stats', handleGetStats);
 app.get('/stats', handleGetStats);
 
-// Users
-app.get('/api/users', handleGetUsers);
-app.get('/users', handleGetUsers);
+// Student Endpoints (Mapped to both /students and /users for seamless compatibility)
+app.get('/api/students', handleGetStudents);
+app.get('/students', handleGetStudents);
+app.get('/api/users', handleGetStudents);
+app.get('/users', handleGetStudents);
 
-app.post('/api/users', handleCreateUser);
-app.post('/users', handleCreateUser);
+app.post('/api/students', handleCreateStudent);
+app.post('/students', handleCreateStudent);
+app.post('/api/users', handleCreateStudent);
+app.post('/users', handleCreateStudent);
 
-app.put('/api/users/:id', handleUpdateUser);
-app.put('/users/:id', handleUpdateUser);
+app.put('/api/students/:id', handleUpdateStudent);
+app.put('/students/:id', handleUpdateStudent);
+app.put('/api/users/:id', handleUpdateStudent);
+app.put('/users/:id', handleUpdateStudent);
 
-app.delete('/api/users/:id', handleDeleteUser);
-app.delete('/users/:id', handleDeleteUser);
+app.delete('/api/students/:id', handleDeleteStudent);
+app.delete('/students/:id', handleDeleteStudent);
+app.delete('/api/users/:id', handleDeleteStudent);
+app.delete('/users/:id', handleDeleteStudent);
 
-// Platform Settings Routes
+// System Settings
 app.get('/api/settings', handleGetSettings);
 app.get('/settings', handleGetSettings);
 
@@ -194,5 +214,5 @@ app.post('/reset', handleResetData);
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
+  console.log(`EduNexus SMS backend running on port ${PORT}`);
 });
