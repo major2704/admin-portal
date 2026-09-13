@@ -36,7 +36,7 @@ export default function App() {
   });
 
   const [theme, setTheme] = useState(() => localStorage.getItem('nexus_theme') || 'dark');
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students' | 'courses' | 'settings'
+  const [activeTab, setActiveTab] = useState('courses'); // 'overview' | 'students' | 'courses' | 'settings'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Platform & Academic Settings
@@ -46,27 +46,40 @@ export default function App() {
   const [feedback, setFeedback] = useState('');
   const [healthStatus, setHealthStatus] = useState(null);
 
-  // Authentication Fields
+  // Auth Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Student Data & Directory State
+  // Stores
   const [students, setStudents] = useState([]);
-  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 3, systemStatus: 'Academic Term Active' });
+  const [courses, setCourses] = useState([
+    { id: '1', code: 'BCA', name: 'Bachelor of Computer Applications', duration: '6 Semesters', dept: 'Department of Computing', head: 'Dr. V. Sharma' },
+    { id: '2', code: 'B.Tech CS', name: 'B.Tech Computer Science & Engineering', duration: '8 Semesters', dept: 'School of Engineering', head: 'Prof. K. Sen' },
+    { id: '3', code: 'MCA', name: 'Master of Computer Applications', duration: '4 Semesters', dept: 'Postgraduate Studies', head: 'Dr. A. Verma' },
+    { id: '4', code: 'B.Sc IT', name: 'B.Sc Information Technology', duration: '6 Semesters', dept: 'Applied Sciences', head: 'Prof. N. Patel' }
+  ]);
+  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 4, systemStatus: 'Academic Term Active' });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCourse, setFilterCourse] = useState('All');
 
-  // Enrollment Modal
+  // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStudent, setNewStudent] = useState({
     name: '',
     email: '',
-    rollNo: '',
-    course: 'BCA',
-    year: '1st Year',
-    status: 'Enrolled'
+    role: 'BCA',
+    status: 'Active'
+  });
+
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [newCourse, setNewCourse] = useState({
+    code: '',
+    name: '',
+    duration: '6 Semesters',
+    dept: 'Department of Computing',
+    head: ''
   });
 
   // Apply Theme
@@ -82,7 +95,7 @@ export default function App() {
     }
   }, [theme]);
 
-  // Initial Fetch
+  // Initial Data Fetch
   useEffect(() => {
     if (user) {
       loadData();
@@ -91,14 +104,19 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      const [statsRes, studentsRes, settingsRes] = await Promise.all([
+      const [statsRes, studentsRes, coursesRes, settingsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/stats`).catch(() => null),
         fetch(`${API_BASE_URL}/students`).catch(() => null),
+        fetch(`${API_BASE_URL}/courses`).catch(() => null),
         fetch(`${API_BASE_URL}/settings`).catch(() => null)
       ]);
 
       if (statsRes && statsRes.ok) setStats(await statsRes.json());
       if (studentsRes && studentsRes.ok) setStudents(await studentsRes.json());
+      if (coursesRes && coursesRes.ok) {
+        const cData = await coursesRes.json();
+        if (Array.isArray(cData) && cData.length > 0) setCourses(cData);
+      }
       if (settingsRes && settingsRes.ok) {
         const sData = await settingsRes.json();
         if (sData.portalName) setPortalName(sData.portalName);
@@ -106,11 +124,11 @@ export default function App() {
         if (typeof sData.maintenanceMode === 'boolean') setMaintenanceMode(sData.maintenanceMode);
       }
     } catch (err) {
-      console.error('Data sync failed:', err);
+      console.error('Sync failed:', err);
     }
   };
 
-  // Auth Handlers
+  // Auth
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -123,7 +141,7 @@ export default function App() {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
+      const data = await res.json().catch(() => ({ error: 'Server response error' }));
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
       localStorage.setItem('nexus_token', data.token);
@@ -146,13 +164,57 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  // Course Actions
+  const handleAddCourse = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE_URL}/courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCourse)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setCourses([...courses, data]);
+        setShowCourseModal(false);
+        setNewCourse({ code: '', name: '', duration: '6 Semesters', dept: 'Department of Computing', head: '' });
+        setFeedback(`Program "${data.code}" added successfully.`);
+        setTimeout(() => setFeedback(''), 3000);
+        loadData();
+      } else {
+        alert(data.error || 'Failed to add course');
+      }
+    } catch (err) {
+      console.error('Course add error:', err);
+    }
+  };
+
+  const handleDeleteCourse = async (id, code) => {
+    if (!window.confirm(`Are you sure you want to remove ${code}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCourses(courses.filter((c) => c.id !== id));
+        if (filterCourse === code) setFilterCourse('All');
+        loadData();
+      }
+    } catch (err) {
+      console.error('Failed to delete course:', err);
+    }
+  };
+
   // Student Actions
-  const handleEnrollStudent = async (e) => {
+  const handleProvisionUser = async (e) => {
     e.preventDefault();
     try {
       const payload = {
-        ...newStudent,
-        rollNo: newStudent.rollNo || `CS-2026-${Math.floor(10 + Math.random() * 90)}`
+        name: newStudent.name,
+        email: newStudent.email,
+        role: newStudent.role,
+        course: newStudent.role,
+        status: newStudent.status,
+        rollNo: `CS-2026-${Math.floor(10 + Math.random() * 90)}`
       };
 
       const res = await fetch(`${API_BASE_URL}/students`, {
@@ -165,16 +227,16 @@ export default function App() {
       if (res.ok) {
         setStudents([data, ...students]);
         setShowAddModal(false);
-        setNewStudent({ name: '', email: '', rollNo: '', course: 'BCA', year: '1st Year', status: 'Enrolled' });
+        setNewStudent({ name: '', email: '', role: courses[0]?.code || 'BCA', status: 'Active' });
         loadData();
       }
     } catch (err) {
-      console.error('Enrollment error:', err);
+      console.error('Student add error:', err);
     }
   };
 
   const handleDeleteStudent = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this student record?')) return;
+    if (!window.confirm('Delete this record?')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/students/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -182,7 +244,7 @@ export default function App() {
         loadData();
       }
     } catch (err) {
-      console.error('Failed to remove student:', err);
+      console.error('Delete error:', err);
     }
   };
 
@@ -195,16 +257,16 @@ export default function App() {
         body: JSON.stringify({ portalName, publicRegistrations, maintenanceMode, theme })
       });
       if (res.ok) {
-        setFeedback('Academic platform settings updated.');
+        setFeedback('Settings updated successfully.');
         setTimeout(() => setFeedback(''), 3000);
       }
     } catch (err) {
-      console.error('Failed to save settings:', err);
+      console.error('Settings save error:', err);
     }
   };
 
   const handleExportDirectory = () => {
-    const blob = new Blob([JSON.stringify({ portalName, date: new Date().toISOString(), stats, students }, null, 2)], {
+    const blob = new Blob([JSON.stringify({ portalName, date: new Date().toISOString(), stats, courses, students }, null, 2)], {
       type: 'application/json'
     });
     const url = URL.createObjectURL(blob);
@@ -213,7 +275,7 @@ export default function App() {
     link.download = `${portalName.toLowerCase().replace(/\s+/g, '-')}-roster.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setFeedback('Student roster report downloaded.');
+    setFeedback('Data export generated.');
     setTimeout(() => setFeedback(''), 3000);
   };
 
@@ -222,8 +284,7 @@ export default function App() {
     const t0 = Date.now();
     try {
       const res = await fetch(`${API_BASE_URL}/stats`);
-      const latency = Date.now() - t0;
-      setHealthStatus(res.ok ? `Online (${latency}ms)` : 'Error');
+      setHealthStatus(res.ok ? `Online (${Date.now() - t0}ms)` : 'Error');
     } catch {
       setHealthStatus('Offline');
     }
@@ -231,26 +292,32 @@ export default function App() {
   };
 
   const handleReset = async () => {
-    if (!window.confirm('Reset all student records to sample initial data?')) return;
+    if (!window.confirm('Reset all courses, records, and settings to factory defaults?')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/reset`, { method: 'POST' });
       if (res.ok) {
-        alert('Academic database reset.');
+        alert('Database restored.');
         window.location.reload();
       }
     } catch (err) {
-      alert('Reset failed: ' + err.message);
+      alert('Reset error: ' + err.message);
     }
   };
 
-  // Filtered Students List
+  // Filtered Students
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
+      const query = searchQuery.toLowerCase();
       const matchesSearch = 
-        s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.rollNo?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCourse = filterCourse === 'All' || s.course === filterCourse;
+        s.name?.toLowerCase().includes(query) ||
+        s.email?.toLowerCase().includes(query) ||
+        s.rollNo?.toLowerCase().includes(query);
+      
+      const matchesCourse = 
+        filterCourse === 'All' || 
+        s.course === filterCourse || 
+        s.role === filterCourse;
+
       return matchesSearch && matchesCourse;
     });
   }, [students, searchQuery, filterCourse]);
@@ -262,7 +329,7 @@ export default function App() {
     { id: 'settings', label: 'Academic Settings', icon: Settings },
   ];
 
-  // --- Auth View (Dean / Admin Login) ---
+  // --- Auth Screen ---
   if (!user) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${
@@ -329,12 +396,12 @@ export default function App() {
     );
   }
 
-  // --- Main Application Dashboard ---
+  // --- Main Dashboard Screen ---
   return (
     <div className={`min-h-screen flex flex-col md:flex-row font-sans transition-colors duration-200 relative ${
       theme === 'dark' ? 'bg-[#060813] text-slate-100' : 'bg-[#f4f6fb] text-slate-900'
     }`}>
-      {/* Mobile Bar */}
+      {/* Mobile Top Bar */}
       <div className={`md:hidden flex items-center justify-between p-4 border-b sticky top-0 z-30 ${
         theme === 'dark' ? 'bg-[#090d1f] border-slate-800' : 'bg-white border-slate-200'
       }`}>
@@ -362,7 +429,7 @@ export default function App() {
         <div onClick={() => setMobileMenuOpen(false)} className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
       )}
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 p-6 flex flex-col justify-between border-r select-none transition-transform duration-300 ease-in-out
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -370,7 +437,6 @@ export default function App() {
         md:static md:shrink-0
       `}>
         <div className="space-y-8">
-          {/* Logo */}
           <button 
             type="button" 
             onClick={() => { setActiveTab('overview'); setMobileMenuOpen(false); }}
@@ -389,7 +455,6 @@ export default function App() {
             </div>
           </button>
 
-          {/* Navigation Links */}
           <nav className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -417,7 +482,7 @@ export default function App() {
         <div className="hidden md:block h-20" />
       </aside>
 
-      {/* Floating Dean / Faculty Profile Card */}
+      {/* Floating Dean Profile Card */}
       <div className={`fixed bottom-4 left-4 md:bottom-6 md:left-6 z-40 w-56 md:w-60 p-3 md:p-3.5 rounded-2xl border flex items-center justify-between shadow-2xl backdrop-blur-md transition-all ${
         theme === 'dark'
           ? 'bg-[#0e122b]/95 border-slate-800/90 shadow-black/60'
@@ -441,7 +506,7 @@ export default function App() {
         </button>
       </div>
 
-      {/* Main Content Viewport */}
+      {/* Main Viewport */}
       <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto w-full">
         <div className="mb-6 md:mb-8">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
@@ -469,7 +534,7 @@ export default function App() {
               {[
                 { label: 'Total Enrolled Students', val: stats.totalUsers },
                 { label: 'Active Students', val: stats.activeUsers },
-                { label: 'Academic Programs', val: stats.totalAdmins },
+                { label: 'Academic Programs', val: courses.length },
                 { label: 'Academic Term', val: maintenanceMode ? 'Semester Freeze' : 'Active Semester' }
               ].map((card, i) => (
                 <div
@@ -497,7 +562,7 @@ export default function App() {
                   className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Enroll Student</span>
+                  <span>Provision New User</span>
                 </button>
               </div>
 
@@ -507,9 +572,8 @@ export default function App() {
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
                       <th className="pb-3 px-2">Roll No</th>
                       <th className="pb-3 px-2">Student Name</th>
-                      <th className="pb-3 px-2">Course / Degree</th>
-                      <th className="pb-3 px-2">Academic Year</th>
-                      <th className="pb-3 px-2">Status</th>
+                      <th className="pb-3 px-2">Role / Program</th>
+                      <th className="pb-3 px-2">Academic Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
@@ -520,11 +584,10 @@ export default function App() {
                           {s.name}
                           <div className="text-[11px] text-slate-400 font-normal">{s.email}</div>
                         </td>
-                        <td className="py-3 px-2 font-medium">{s.course || s.role}</td>
-                        <td className="py-3 px-2 text-slate-400">{s.year || '1st Year'}</td>
+                        <td className="py-3 px-2 font-medium">{s.role || s.course}</td>
                         <td className="py-3 px-2">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                            s.status === 'Enrolled' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                            s.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : s.status === 'Admin' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-amber-500/10 text-amber-400'
                           }`}>
                             {s.status}
                           </span>
@@ -538,7 +601,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 2: STUDENT ROSTER (FULL DIRECTORY) --- */}
+        {/* --- TAB 2: STUDENT ROSTER --- */}
         {activeTab === 'students' && (
           <div className="space-y-6 max-w-6xl pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -551,57 +614,64 @@ export default function App() {
                 className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Enroll New Student</span>
+                <span>Provision New User</span>
               </button>
             </div>
 
-            {/* Filter Bar */}
-            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row gap-3 items-center justify-between ${
-              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
-            }`}>
-              <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            {/* Dynamic Program Filter Pills Generated from Courses Store */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-slate-400" />
+                </div>
                 <input
                   type="text"
-                  placeholder="Search by name, roll no, email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border outline-none ${
-                    theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-200'
+                  placeholder="Filter by name, roll no, or email..."
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm outline-none transition ${
+                    theme === 'dark'
+                      ? 'bg-[#090d1f] border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500'
+                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-600 shadow-sm'
                   }`}
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs text-slate-400">Degree:</span>
-                <select
-                  value={filterCourse}
-                  onChange={(e) => setFilterCourse(e.target.value)}
-                  className={`px-3 py-2 text-xs rounded-xl border outline-none cursor-pointer ${
-                    theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <option value="All">All Degrees</option>
-                  <option value="BCA">BCA</option>
-                  <option value="B.Tech CS">B.Tech CS</option>
-                  <option value="MCA">MCA</option>
-                  <option value="B.Sc IT">B.Sc IT</option>
-                </select>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-semibold text-slate-400 mr-1.5">Program:</span>
+                {['All', ...courses.map(c => c.code)].map((cCode) => {
+                  const isSelected = filterCourse === cCode;
+                  return (
+                    <button
+                      key={cCode}
+                      type="button"
+                      onClick={() => setFilterCourse(cCode)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
+                          : theme === 'dark'
+                          ? 'bg-[#0e132b] text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+                          : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 shadow-sm'
+                      }`}
+                    >
+                      {cCode}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Students Table */}
+            {/* Table */}
             <div className={`p-5 sm:p-8 rounded-3xl border ${
-              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
             }`}>
               <div className="overflow-x-auto -mx-2 sm:mx-0">
                 <table className="w-full text-left text-xs sm:text-sm min-w-[650px]">
                   <thead>
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
                       <th className="pb-3 px-2">Roll No</th>
-                      <th className="pb-3 px-2">Student</th>
-                      <th className="pb-3 px-2">Degree</th>
-                      <th className="pb-3 px-2">Year</th>
+                      <th className="pb-3 px-2">User / Student</th>
+                      <th className="pb-3 px-2">Role</th>
                       <th className="pb-3 px-2">Status</th>
                       <th className="pb-3 px-2 text-right">Action</th>
                     </tr>
@@ -609,8 +679,8 @@ export default function App() {
                   <tbody className="divide-y divide-slate-800/40">
                     {filteredStudents.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center py-6 text-slate-400 text-xs">
-                          No students found matching your criteria.
+                        <td colSpan="5" className="text-center py-6 text-slate-400 text-xs">
+                          No records found matching your criteria.
                         </td>
                       </tr>
                     ) : (
@@ -621,11 +691,10 @@ export default function App() {
                             {s.name}
                             <div className="text-[11px] text-slate-400 font-normal">{s.email}</div>
                           </td>
-                          <td className="py-3 px-2 font-medium">{s.course || s.role}</td>
-                          <td className="py-3 px-2 text-slate-400">{s.year || '1st Year'}</td>
+                          <td className="py-3 px-2 font-medium">{s.role || s.course}</td>
                           <td className="py-3 px-2">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                              s.status === 'Enrolled' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                              s.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : s.status === 'Admin' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-amber-500/10 text-amber-400'
                             }`}>
                               {s.status}
                             </span>
@@ -634,7 +703,7 @@ export default function App() {
                             <button
                               onClick={() => handleDeleteStudent(s.id)}
                               className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                              title="Drop student record"
+                              title="Delete record"
                             >
                               <Trash2 className="w-4 h-4 inline" />
                             </button>
@@ -649,31 +718,58 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 3: ACADEMIC DEPARTMENTS & DEGREES --- */}
+        {/* --- TAB 3: ACADEMIC DEPARTMENTS & DEGREES (ADMIN MANAGEMENT) --- */}
         {activeTab === 'courses' && (
-          <div className="max-w-4xl space-y-6 pb-24 md:pb-16">
-            <div className={`p-6 sm:p-8 rounded-3xl border ${
-              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
-            }`}>
-              <h2 className="text-lg font-bold mb-1">Academic Programs Offered</h2>
-              <p className="text-xs text-slate-400 mb-6">Accredited undergraduate and postgraduate programs</p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { name: 'BCA (Bachelor of Computer Applications)', sem: '6 Semesters', dept: 'Department of Computing', head: 'Dr. V. Sharma' },
-                  { name: 'B.Tech Computer Science & Engineering', sem: '8 Semesters', dept: 'School of Engineering', head: 'Prof. K. Sen' },
-                  { name: 'MCA (Master of Computer Applications)', sem: '4 Semesters', dept: 'Postgraduate Studies', head: 'Dr. A. Verma' },
-                  { name: 'B.Sc Information Technology', sem: '6 Semesters', dept: 'Applied Sciences', head: 'Prof. N. Patel' }
-                ].map((c, idx) => (
-                  <div key={idx} className={`p-4 rounded-2xl border space-y-2 ${
-                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="text-sm font-bold text-indigo-400">{c.name}</div>
-                    <div className="text-xs text-slate-400">{c.dept} • {c.sem}</div>
-                    <div className="text-[11px] text-slate-500 font-medium">Head of Program: {c.head}</div>
-                  </div>
-                ))}
+          <div className="max-w-5xl space-y-6 pb-24 md:pb-16">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold">Academic Degrees & Programs</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Define and curate authorized courses offered by the institution</p>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowCourseModal(true)}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Degree Program</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {courses.map((c) => (
+                <div
+                  key={c.id}
+                  className={`p-5 rounded-3xl border flex flex-col justify-between transition ${
+                    theme === 'dark' ? 'bg-[#090d1f] border-slate-800/90' : 'bg-white border-slate-200 shadow-sm'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold text-xs">
+                          {c.code}
+                        </span>
+                        <span className="text-xs text-slate-400">{c.duration}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteCourse(c.id, c.code)}
+                        className="text-slate-500 hover:text-red-400 p-1 transition cursor-pointer"
+                        title="Remove Degree Program"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="text-sm font-bold mt-1">{c.name}</div>
+                    <div className="text-xs text-slate-400 mt-1">{c.dept}</div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-slate-800/40 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Program Head:</span>
+                    <span className="font-semibold text-slate-300">{c.head || 'Assigned Dean'}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -745,7 +841,6 @@ export default function App() {
               </form>
             </div>
 
-            {/* Quick Action Diagnostic & Tools */}
             <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl space-y-5 ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
@@ -833,102 +928,225 @@ export default function App() {
         )}
       </main>
 
-      {/* --- ENROLL STUDENT MODAL --- */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 ${
-            theme === 'dark' ? 'bg-[#090d1f] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
-            <h2 className="text-lg font-bold">Enroll New Student</h2>
-            <form onSubmit={handleEnrollStudent} className="space-y-4">
+      {/* --- ADD NEW DEGREE MODAL (FOR ADMIN) --- */}
+      {showCourseModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-[460px] bg-[#0c1021] border border-slate-800/90 text-white rounded-3xl p-6 sm:p-7 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              type="button"
+              onClick={() => setShowCourseModal(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="mb-5">
+              <h2 className="text-xl font-bold tracking-tight">Add Degree Program</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Register a new academic degree or department program</p>
+            </div>
+
+            <form onSubmit={handleAddCourse} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Student Full Name</label>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  PROGRAM CODE / SHORT IDENTIFIER
+                </label>
                 <input
                   type="text"
                   required
-                  value={newStudent.name}
-                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                  placeholder="Aarav Sharma"
-                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
-                  }`}
+                  value={newCourse.code}
+                  onChange={(e) => setNewCourse({ ...newCourse, code: e.target.value })}
+                  placeholder="e.g. BCA, MCA, B.Tech AI"
+                  className="w-full px-4 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Institutional Email</label>
-                <input
-                  type="email"
-                  required
-                  value={newStudent.email}
-                  onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
-                  placeholder="aarav@campus.edu"
-                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Roll No / Student ID (Optional)</label>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  FULL DEGREE TITLE
+                </label>
                 <input
                   type="text"
-                  value={newStudent.rollNo}
-                  onChange={(e) => setNewStudent({ ...newStudent, rollNo: e.target.value })}
-                  placeholder="CS-2026-05"
-                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
-                  }`}
+                  required
+                  value={newCourse.name}
+                  onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
+                  placeholder="e.g. Bachelor of Computer Applications"
+                  className="w-full px-4 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Program</label>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    DURATION
+                  </label>
                   <select
-                    value={newStudent.course}
-                    onChange={(e) => setNewStudent({ ...newStudent, course: e.target.value })}
-                    className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
-                    }`}
+                    value={newCourse.duration}
+                    onChange={(e) => setNewCourse({ ...newCourse, duration: e.target.value })}
+                    className="w-full px-3.5 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 outline-none focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="BCA">BCA</option>
-                    <option value="B.Tech CS">B.Tech CS</option>
-                    <option value="MCA">MCA</option>
-                    <option value="B.Sc IT">B.Sc IT</option>
+                    <option value="2 Semesters">2 Semesters (1 Yr)</option>
+                    <option value="4 Semesters">4 Semesters (2 Yrs)</option>
+                    <option value="6 Semesters">6 Semesters (3 Yrs)</option>
+                    <option value="8 Semesters">8 Semesters (4 Yrs)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Year</label>
-                  <select
-                    value={newStudent.year}
-                    onChange={(e) => setNewStudent({ ...newStudent, year: e.target.value })}
-                    className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
-                    }`}
-                  >
-                    <option value="1st Year">1st Year</option>
-                    <option value="2nd Year">2nd Year</option>
-                    <option value="3rd Year">3rd Year</option>
-                    <option value="4th Year">4th Year</option>
-                  </select>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    PROGRAM HEAD
+                  </label>
+                  <input
+                    type="text"
+                    value={newCourse.head}
+                    onChange={(e) => setNewCourse({ ...newCourse, head: e.target.value })}
+                    placeholder="Prof. / Dr. Name"
+                    className="w-full px-3.5 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  FACULTY / DEPARTMENT
+                </label>
+                <input
+                  type="text"
+                  value={newCourse.dept}
+                  onChange={(e) => setNewCourse({ ...newCourse, dept: e.target.value })}
+                  placeholder="e.g. Department of Computing"
+                  className="w-full px-4 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                  onClick={() => setShowCourseModal(false)}
+                  className="text-sm font-semibold text-slate-400 hover:text-white transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition cursor-pointer"
                 >
-                  Complete Enrollment
+                  Register Program
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- PROVISION NEW USER / STUDENT MODAL --- */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-[440px] bg-[#0c1021] border border-slate-800/90 text-white rounded-3xl p-6 sm:p-7 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="mb-6">
+              <h2 className="text-xl font-bold tracking-tight text-white">Provision New User</h2>
+              <p className="text-xs text-slate-400 mt-1">Assign directory privileges and account states</p>
+            </div>
+
+            <form onSubmit={handleProvisionUser} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  DISPLAY NAME
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newStudent.name}
+                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                  placeholder="e.g. John Doe"
+                  className="w-full px-4 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  EMAIL ADDRESS
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newStudent.email}
+                  onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                  placeholder="name@company.com"
+                  className="w-full px-4 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {/* Dynamically populated Role / Degree dropdown */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    ROLE / PROGRAM
+                  </label>
+                  <select
+                    value={newStudent.role}
+                    onChange={(e) => setNewStudent({ ...newStudent, role: e.target.value })}
+                    className="w-full px-3.5 py-3 rounded-xl bg-[#060813] border border-indigo-500/80 text-sm text-slate-100 outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundSize: '1em'
+                    }}
+                  >
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.code} className="bg-[#0c1021]">
+                        {c.code}
+                      </option>
+                    ))}
+                    <option value="Admin" className="bg-[#0c1021]">Admin</option>
+                    <option value="Editor" className="bg-[#0c1021]">Editor</option>
+                    <option value="Viewer" className="bg-[#0c1021]">Viewer</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    STATUS
+                  </label>
+                  <select
+                    value={newStudent.status}
+                    onChange={(e) => setNewStudent({ ...newStudent, status: e.target.value })}
+                    className="w-full px-3.5 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundSize: '1em'
+                    }}
+                  >
+                    <option value="Active" className="bg-[#0c1021]">Active</option>
+                    <option value="Inactive" className="bg-[#0c1021]">Inactive</option>
+                    <option value="Admin" className="bg-[#0c1021]">Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-4 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="text-sm font-semibold text-slate-400 hover:text-white transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-[#4f46e5] hover:bg-[#4338ca] text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                >
+                  Confirm User
                 </button>
               </div>
             </form>

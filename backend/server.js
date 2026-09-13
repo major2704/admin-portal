@@ -24,27 +24,33 @@ app.get('/', (req, res) => {
   res.json({ status: 'EduNexus SMS API is online and healthy' });
 });
 
-// Initial Student Seed Data
-const initialStudents = [
-  { id: '1', rollNo: 'CS-2026-01', name: 'Aarav Sharma', email: 'aarav.sharma@campus.edu', course: 'BCA', year: '3rd Year', status: 'Enrolled', joinedAt: '2025-01-12' },
-  { id: '2', rollNo: 'CS-2026-02', name: 'Pooja Verma', email: 'pooja.verma@campus.edu', course: 'BCA', year: '2nd Year', status: 'Enrolled', joinedAt: '2025-02-04' },
-  { id: '3', rollNo: 'CS-2026-03', name: 'Rohan Mehta', email: 'rohan.mehta@campus.edu', course: 'B.Tech CS', year: '1st Year', status: 'On Leave', joinedAt: '2025-03-18' },
-  { id: '4', rollNo: 'CS-2026-04', name: 'Sneha Patel', email: 'sneha.patel@campus.edu', course: 'MCA', year: '1st Year', status: 'Enrolled', joinedAt: '2025-04-10' }
+// Initial Courses Seed Data
+const initialCourses = [
+  { id: '1', code: 'BCA', name: 'Bachelor of Computer Applications', duration: '6 Semesters', dept: 'Department of Computing', head: 'Dr. V. Sharma' },
+  { id: '2', code: 'B.Tech CS', name: 'B.Tech Computer Science & Engineering', duration: '8 Semesters', dept: 'School of Engineering', head: 'Prof. K. Sen' },
+  { id: '3', code: 'MCA', name: 'Master of Computer Applications', duration: '4 Semesters', dept: 'Postgraduate Studies', head: 'Dr. A. Verma' },
+  { id: '4', code: 'B.Sc IT', name: 'B.Sc Information Technology', duration: '6 Semesters', dept: 'Applied Sciences', head: 'Prof. N. Patel' }
 ];
 
-// In-Memory Data Stores
-let students = [...initialStudents];
+// Initial Student Seed Data
+const initialStudents = [
+  { id: '1', rollNo: 'CS-2026-01', name: 'Aarav Sharma', email: 'aarav.sharma@campus.edu', course: 'BCA', year: '3rd Year', role: 'BCA', status: 'Active', joinedAt: '2025-01-12' },
+  { id: '2', rollNo: 'CS-2026-02', name: 'Pooja Verma', email: 'pooja.verma@campus.edu', course: 'BCA', year: '2nd Year', role: 'BCA', status: 'Active', joinedAt: '2025-02-04' },
+  { id: '3', rollNo: 'CS-2026-03', name: 'Rohan Mehta', email: 'rohan.mehta@campus.edu', course: 'B.Tech CS', year: '1st Year', role: 'B.Tech CS', status: 'Inactive', joinedAt: '2025-03-18' },
+  { id: '4', rollNo: 'CS-2026-04', name: 'Sneha Patel', email: 'sneha.patel@campus.edu', course: 'MCA', year: '1st Year', role: 'MCA', status: 'Admin', joinedAt: '2025-04-10' }
+];
 
+// In-Memory Stores
+let students = [...initialStudents];
+let courses = [...initialCourses];
 let platformSettings = {
   portalName: 'EduNexus SMS',
-  publicRegistrations: true, // Student self-enrollment toggle
-  maintenanceMode: false,     // Semester grade freeze toggle
+  publicRegistrations: true,
+  maintenanceMode: false,
   theme: 'dark'
 };
 
-// --- Handlers ---
-
-// Admin Authentication
+// Handlers
 const handleLogin = (req, res) => {
   const { email, password } = req.body;
   if (email === CUSTOM_ADMIN_EMAIL && password === CUSTOM_ADMIN_PASSWORD) {
@@ -61,26 +67,44 @@ const handleLogin = (req, res) => {
   return res.status(401).json({ error: 'Invalid admin email or password.' });
 };
 
-// Academic System Statistics
 const handleGetStats = (req, res) => {
-  const totalStudents = students.length;
-  const activeUsers = students.filter(s => s.status === 'Enrolled').length;
-  const totalCourses = new Set(students.map(s => s.course)).size;
-
   res.json({
-    totalUsers: totalStudents,
-    activeUsers: activeUsers,
-    totalAdmins: totalCourses, // Reflects distinct academic departments/courses
+    totalUsers: students.length,
+    activeUsers: students.filter(s => s.status === 'Active' || s.status === 'Enrolled').length,
+    totalAdmins: courses.length,
     systemStatus: platformSettings.maintenanceMode ? 'Semester Freeze' : 'Academic Term Active'
   });
 };
 
-// Fetch Student Directory
-const handleGetStudents = (req, res) => {
-  res.json(students);
+// Courses Handlers
+const handleGetCourses = (req, res) => res.json(courses);
+
+const handleCreateCourse = (req, res) => {
+  const { code, name, duration, dept, head } = req.body;
+  if (!code || !name) {
+    return res.status(400).json({ error: 'Course code and name are required.' });
+  }
+  const newCourse = {
+    id: Date.now().toString(),
+    code: code.trim().toUpperCase(),
+    name: name.trim(),
+    duration: duration || '6 Semesters',
+    dept: dept || 'Department of Computing',
+    head: head || 'Faculty Admin'
+  };
+  courses.push(newCourse);
+  res.status(201).json(newCourse);
 };
 
-// Enroll / Add New Student
+const handleDeleteCourse = (req, res) => {
+  const { id } = req.params;
+  courses = courses.filter(c => c.id !== id && c.code !== id);
+  res.json({ message: 'Course removed successfully.' });
+};
+
+// Students Handlers
+const handleGetStudents = (req, res) => res.json(students);
+
 const handleCreateStudent = (req, res) => {
   const { name, email, rollNo, course, year, role, status } = req.body;
   if (!name || !email) {
@@ -94,8 +118,8 @@ const handleCreateStudent = (req, res) => {
     email,
     course: course || role || 'BCA',
     year: year || '1st Year',
-    role: course || role || 'BCA', // Kept for backward compatibility with frontend tables
-    status: status || 'Enrolled',
+    role: role || course || 'Viewer',
+    status: status || 'Active',
     joinedAt: new Date().toISOString().split('T')[0]
   };
 
@@ -103,82 +127,54 @@ const handleCreateStudent = (req, res) => {
   res.status(201).json(newStudent);
 };
 
-// Update Student Record
-const handleUpdateStudent = (req, res) => {
-  const { id } = req.params;
-  const { name, email, rollNo, course, year, role, status } = req.body;
-
-  const index = students.findIndex(s => s.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Student record not found.' });
-  }
-
-  students[index] = {
-    ...students[index],
-    name: name ?? students[index].name,
-    email: email ?? students[index].email,
-    rollNo: rollNo ?? students[index].rollNo,
-    course: course ?? role ?? students[index].course,
-    year: year ?? students[index].year,
-    role: course ?? role ?? students[index].role,
-    status: status ?? students[index].status
-  };
-
-  res.json(students[index]);
-};
-
-// Remove / Drop Student
 const handleDeleteStudent = (req, res) => {
   const { id } = req.params;
   students = students.filter(s => s.id !== id);
-  res.json({ message: 'Student record removed successfully.' });
+  res.json({ message: 'Record deleted successfully.' });
 };
 
-// Platform & Academic Settings Handlers
-const handleGetSettings = (req, res) => {
-  res.json(platformSettings);
-};
+// Platform Settings
+const handleGetSettings = (req, res) => res.json(platformSettings);
 
 const handleUpdateSettings = (req, res) => {
   const { portalName, publicRegistrations, maintenanceMode, theme } = req.body;
-
   platformSettings = {
     portalName: portalName ?? platformSettings.portalName,
     publicRegistrations: typeof publicRegistrations === 'boolean' ? publicRegistrations : platformSettings.publicRegistrations,
     maintenanceMode: typeof maintenanceMode === 'boolean' ? maintenanceMode : platformSettings.maintenanceMode,
     theme: theme ?? platformSettings.theme
   };
-
-  res.json({
-    message: 'Academic platform settings updated successfully.',
-    settings: platformSettings
-  });
+  res.json({ message: 'Settings updated successfully.', settings: platformSettings });
 };
 
-// Reset In-Memory Records to Defaults
 const handleResetData = (req, res) => {
   students = [...initialStudents];
+  courses = [...initialCourses];
   platformSettings = {
     portalName: 'EduNexus SMS',
     publicRegistrations: true,
     maintenanceMode: false,
     theme: 'dark'
   };
-  res.json({ message: 'Student database and academic settings reset to factory defaults.' });
+  res.json({ message: 'Platform data restored to default seed state.' });
 };
 
-// --- Route Registrations (Both /api and root paths) ---
-
-// Auth
+// --- Routes ---
 app.post('/api/auth/login', handleLogin);
-app.post('/api/login', handleLogin);
 app.post('/auth/login', handleLogin);
 
-// Academic Telemetry & Statistics
 app.get('/api/stats', handleGetStats);
 app.get('/stats', handleGetStats);
 
-// Student Endpoints (Mapped to both /students and /users for seamless compatibility)
+// Courses Routes
+app.get('/api/courses', handleGetCourses);
+app.get('/courses', handleGetCourses);
+app.post('/api/courses', handleCreateCourse);
+app.post('/courses', handleCreateCourse);
+app.delete('/api/courses/:id', handleDeleteCourse);
+app.delete('/courses/:id', handleDeleteCourse);
+
+// Students / Users Routes
 app.get('/api/students', handleGetStudents);
 app.get('/students', handleGetStudents);
 app.get('/api/users', handleGetStudents);
@@ -189,30 +185,20 @@ app.post('/students', handleCreateStudent);
 app.post('/api/users', handleCreateStudent);
 app.post('/users', handleCreateStudent);
 
-app.put('/api/students/:id', handleUpdateStudent);
-app.put('/students/:id', handleUpdateStudent);
-app.put('/api/users/:id', handleUpdateStudent);
-app.put('/users/:id', handleUpdateStudent);
-
 app.delete('/api/students/:id', handleDeleteStudent);
 app.delete('/students/:id', handleDeleteStudent);
 app.delete('/api/users/:id', handleDeleteStudent);
 app.delete('/users/:id', handleDeleteStudent);
 
-// System Settings
+// Settings & Reset
 app.get('/api/settings', handleGetSettings);
 app.get('/settings', handleGetSettings);
-
 app.post('/api/settings', handleUpdateSettings);
 app.post('/settings', handleUpdateSettings);
-app.put('/api/settings', handleUpdateSettings);
-app.put('/settings', handleUpdateSettings);
 
-// Reset Route
 app.post('/api/reset', handleResetData);
 app.post('/reset', handleResetData);
 
-// Start Server
 app.listen(PORT, () => {
-  console.log(`EduNexus SMS backend running on port ${PORT}`);
+  console.log(`EduNexus SMS server live on port ${PORT}`);
 });
