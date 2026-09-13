@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  LayoutDashboard, 
+  GraduationCap, 
   Users, 
-  ShieldCheck, 
+  BookOpen, 
   Settings, 
   Sun, 
   Moon, 
@@ -14,9 +14,10 @@ import {
   Sparkles, 
   ExternalLink, 
   Trash2, 
-  Plus,
-  Menu,
-  X
+  Plus, 
+  Search, 
+  Menu, 
+  X 
 } from 'lucide-react';
 
 const API_BASE_URL = (
@@ -27,37 +28,48 @@ export default function App() {
   // Authentication & Session Persistence
   const [user, setUser] = useState(() => {
     try {
-      const savedUser = localStorage.getItem('nexus_user');
-      return savedUser ? JSON.parse(savedUser) : null;
+      const saved = localStorage.getItem('nexus_user');
+      return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
   });
 
   const [theme, setTheme] = useState(() => localStorage.getItem('nexus_theme') || 'dark');
-  const [activeTab, setActiveTab] = useState('settings'); // 'overview' | 'team' | 'permissions' | 'settings'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students' | 'courses' | 'settings'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Settings State
-  const [portalName, setPortalName] = useState('NexusAdmin');
+  // Platform & Academic Settings
+  const [portalName, setPortalName] = useState('EduNexus SMS');
   const [publicRegistrations, setPublicRegistrations] = useState(true);
-  const [maintenanceMode, setMaintenanceMode] = useState(true);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [healthStatus, setHealthStatus] = useState(null);
 
-  // Auth Inputs
+  // Authentication Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Data Store
-  const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 1, systemStatus: 'Optimal' });
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Viewer', status: 'Active' });
+  // Student Data & Directory State
+  const [students, setStudents] = useState([]);
+  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 3, systemStatus: 'Academic Term Active' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCourse, setFilterCourse] = useState('All');
 
-  // Theme Sync
+  // Enrollment Modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStudent, setNewStudent] = useState({
+    name: '',
+    email: '',
+    rollNo: '',
+    course: 'BCA',
+    year: '1st Year',
+    status: 'Enrolled'
+  });
+
+  // Apply Theme
   useEffect(() => {
     localStorage.setItem('nexus_theme', theme);
     const root = document.documentElement;
@@ -70,7 +82,7 @@ export default function App() {
     }
   }, [theme]);
 
-  // Initial Load
+  // Initial Fetch
   useEffect(() => {
     if (user) {
       loadData();
@@ -79,14 +91,22 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, studentsRes, settingsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/stats`).catch(() => null),
-        fetch(`${API_BASE_URL}/users`).catch(() => null)
+        fetch(`${API_BASE_URL}/students`).catch(() => null),
+        fetch(`${API_BASE_URL}/settings`).catch(() => null)
       ]);
+
       if (statsRes && statsRes.ok) setStats(await statsRes.json());
-      if (usersRes && usersRes.ok) setUsers(await usersRes.json());
+      if (studentsRes && studentsRes.ok) setStudents(await studentsRes.json());
+      if (settingsRes && settingsRes.ok) {
+        const sData = await settingsRes.json();
+        if (sData.portalName) setPortalName(sData.portalName);
+        if (typeof sData.publicRegistrations === 'boolean') setPublicRegistrations(sData.publicRegistrations);
+        if (typeof sData.maintenanceMode === 'boolean') setMaintenanceMode(sData.maintenanceMode);
+      }
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('Data sync failed:', err);
     }
   };
 
@@ -103,8 +123,8 @@ export default function App() {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json().catch(() => ({ error: 'Server response error' }));
-      if (!res.ok) throw new Error(data.error || 'Invalid credentials');
+      const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
+      if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
       localStorage.setItem('nexus_token', data.token);
       localStorage.setItem('nexus_user', JSON.stringify(data.user));
@@ -126,101 +146,138 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Action Buttons Handlers
-  const handleSaveSettings = (e) => {
+  // Student Actions
+  const handleEnrollStudent = async (e) => {
     e.preventDefault();
-    setFeedback('Platform settings updated successfully.');
-    setTimeout(() => setFeedback(''), 3000);
+    try {
+      const payload = {
+        ...newStudent,
+        rollNo: newStudent.rollNo || `CS-2026-${Math.floor(10 + Math.random() * 90)}`
+      };
+
+      const res = await fetch(`${API_BASE_URL}/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setStudents([data, ...students]);
+        setShowAddModal(false);
+        setNewStudent({ name: '', email: '', rollNo: '', course: 'BCA', year: '1st Year', status: 'Enrolled' });
+        loadData();
+      }
+    } catch (err) {
+      console.error('Enrollment error:', err);
+    }
   };
 
-  const handleExportData = () => {
-    const reportData = {
-      portalName,
-      exportDate: new Date().toISOString(),
-      systemStats: stats,
-      membersRoster: users
-    };
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+  const handleDeleteStudent = async (id) => {
+    if (!window.confirm('Are you sure you want to remove this student record?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/students/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setStudents(students.filter((s) => s.id !== id));
+        loadData();
+      }
+    } catch (err) {
+      console.error('Failed to remove student:', err);
+    }
+  };
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE_URL}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portalName, publicRegistrations, maintenanceMode, theme })
+      });
+      if (res.ok) {
+        setFeedback('Academic platform settings updated.');
+        setTimeout(() => setFeedback(''), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    }
+  };
+
+  const handleExportDirectory = () => {
+    const blob = new Blob([JSON.stringify({ portalName, date: new Date().toISOString(), stats, students }, null, 2)], {
+      type: 'application/json'
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${portalName.toLowerCase()}-audit-report.json`;
+    link.download = `${portalName.toLowerCase().replace(/\s+/g, '-')}-roster.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setFeedback('Audit report downloaded successfully.');
+    setFeedback('Student roster report downloaded.');
     setTimeout(() => setFeedback(''), 3000);
   };
 
-  const handlePingServer = async () => {
+  const handlePing = async () => {
     setHealthStatus('Pinging...');
-    const startTime = Date.now();
+    const t0 = Date.now();
     try {
       const res = await fetch(`${API_BASE_URL}/stats`);
-      const latency = Date.now() - startTime;
-      if (res.ok) {
-        setHealthStatus(`Online (${latency}ms)`);
-      } else {
-        setHealthStatus('Error 500');
-      }
+      const latency = Date.now() - t0;
+      setHealthStatus(res.ok ? `Online (${latency}ms)` : 'Error');
     } catch {
-      setHealthStatus('Unreachable');
+      setHealthStatus('Offline');
     }
     setTimeout(() => setHealthStatus(null), 4000);
   };
 
-  const handleAddMember = async (e) => {
-    e.preventDefault();
+  const handleReset = async () => {
+    if (!window.confirm('Reset all student records to sample initial data?')) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMember)
-      });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE_URL}/reset`, { method: 'POST' });
       if (res.ok) {
-        setUsers([data, ...users]);
-        setShowAddModal(false);
-        setNewMember({ name: '', email: '', role: 'Viewer', status: 'Active' });
+        alert('Academic database reset.');
+        window.location.reload();
       }
     } catch (err) {
-      console.error(err);
+      alert('Reset failed: ' + err.message);
     }
   };
 
-  const handleDeleteUser = async (id) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/users/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setUsers(users.filter((u) => u.id !== id));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // Filtered Students List
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      const matchesSearch = 
+        s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.rollNo?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCourse = filterCourse === 'All' || s.course === filterCourse;
+      return matchesSearch && matchesCourse;
+    });
+  }, [students, searchQuery, filterCourse]);
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'team', label: 'Team & Users', icon: Users },
-    { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'overview', label: 'Dashboard', icon: GraduationCap },
+    { id: 'students', label: 'Students Roster', icon: Users },
+    { id: 'courses', label: 'Departments & Degrees', icon: BookOpen },
+    { id: 'settings', label: 'Academic Settings', icon: Settings },
   ];
 
-  // --- Login View ---
+  // --- Auth View (Dean / Admin Login) ---
   if (!user) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 sm:p-6 transition-colors ${
+      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${
         theme === 'dark' ? 'bg-[#060813] text-white' : 'bg-slate-100 text-slate-900'
       }`}>
         <div className={`w-full max-w-md p-6 sm:p-8 rounded-3xl border shadow-2xl ${
           theme === 'dark' ? 'bg-[#0d1024] border-slate-800' : 'bg-white border-slate-200 shadow-slate-200'
         }`}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
-              <Sparkles className="w-5 h-5" />
+            <div className="p-3 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
+              <GraduationCap className="w-6 h-6" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">{portalName}</h1>
-              <p className="text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">ENTERPRISE</p>
+              <p className="text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">CAMPUS ADMINISTRATION</p>
             </div>
           </div>
 
@@ -232,7 +289,7 @@ export default function App() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Admin Email</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Dean / Faculty Email</label>
               <input
                 type="email"
                 required
@@ -246,7 +303,7 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Administrative Password</label>
               <input
                 type="password"
                 required
@@ -264,7 +321,7 @@ export default function App() {
               disabled={authLoading}
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 cursor-pointer"
             >
-              {authLoading ? 'Verifying...' : 'Sign In to Enterprise'}
+              {authLoading ? 'Verifying Faculty Access...' : 'Sign In to Campus SMS'}
             </button>
           </form>
         </div>
@@ -272,25 +329,22 @@ export default function App() {
     );
   }
 
-  // --- Main Dashboard Screen ---
+  // --- Main Application Dashboard ---
   return (
     <div className={`min-h-screen flex flex-col md:flex-row font-sans transition-colors duration-200 relative ${
       theme === 'dark' ? 'bg-[#060813] text-slate-100' : 'bg-[#f4f6fb] text-slate-900'
     }`}>
-      {/* Mobile Top App Bar */}
+      {/* Mobile Bar */}
       <div className={`md:hidden flex items-center justify-between p-4 border-b sticky top-0 z-30 ${
         theme === 'dark' ? 'bg-[#090d1f] border-slate-800' : 'bg-white border-slate-200'
       }`}>
-        <button 
-          onClick={() => setActiveTab('overview')} 
-          className="flex items-center gap-2.5 text-left focus:outline-none"
-        >
+        <button onClick={() => setActiveTab('overview')} className="flex items-center gap-2.5 text-left focus:outline-none">
           <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md">
-            <Sparkles className="w-4 h-4" />
+            <GraduationCap className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-sm font-bold tracking-tight">{portalName}</div>
-            <div className="text-[9px] font-bold text-indigo-400 tracking-wider">ENTERPRISE</div>
+            <div className="text-sm font-bold">{portalName}</div>
+            <div className="text-[9px] font-bold text-indigo-400 uppercase">STUDENT PORTAL</div>
           </div>
         </button>
 
@@ -304,12 +358,8 @@ export default function App() {
         </button>
       </div>
 
-      {/* Mobile Overlay Backdrop */}
       {mobileMenuOpen && (
-        <div 
-          onClick={() => setMobileMenuOpen(false)} 
-          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity" 
-        />
+        <div onClick={() => setMobileMenuOpen(false)} className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
       )}
 
       {/* Sidebar Navigation */}
@@ -320,22 +370,21 @@ export default function App() {
         md:static md:shrink-0
       `}>
         <div className="space-y-8">
-          {/* Logo & Portal Name */}
+          {/* Logo */}
           <button 
             type="button" 
             onClick={() => { setActiveTab('overview'); setMobileMenuOpen(false); }}
             className="flex items-center gap-3 group text-left w-full focus:outline-none cursor-pointer"
-            title="Click to go to Overview Dashboard"
           >
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5" />
+              <GraduationCap className="w-5 h-5" />
             </div>
             <div>
               <div className="text-base font-bold tracking-tight group-hover:text-indigo-400 transition-colors">
                 {portalName}
               </div>
               <div className="text-[10px] font-bold tracking-widest text-indigo-400 uppercase">
-                ENTERPRISE
+                STUDENT SYSTEM
               </div>
             </div>
           </button>
@@ -365,11 +414,10 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Space reserved so floating card doesn't cover content on desktop */}
         <div className="hidden md:block h-20" />
       </aside>
 
-      {/* Floating Master Admin Profile Card */}
+      {/* Floating Dean / Faculty Profile Card */}
       <div className={`fixed bottom-4 left-4 md:bottom-6 md:left-6 z-40 w-56 md:w-60 p-3 md:p-3.5 rounded-2xl border flex items-center justify-between shadow-2xl backdrop-blur-md transition-all ${
         theme === 'dark'
           ? 'bg-[#0e122b]/95 border-slate-800/90 shadow-black/60'
@@ -377,11 +425,11 @@ export default function App() {
       }`}>
         <div className="flex items-center gap-2.5 md:gap-3 overflow-hidden">
           <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
-            MA
+            DA
           </div>
           <div className="text-left truncate">
-            <div className="text-xs font-bold leading-tight truncate">Master Admin</div>
-            <div className="text-[10px] text-slate-400">Admin</div>
+            <div className="text-xs font-bold leading-tight truncate">Dean / Faculty</div>
+            <div className="text-[10px] text-slate-400">Head Administrator</div>
           </div>
         </div>
         <button 
@@ -393,18 +441,17 @@ export default function App() {
         </button>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Viewport */}
       <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto w-full">
-        {/* Top Header */}
         <div className="mb-6 md:mb-8">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-            {activeTab === 'settings' && 'Platform Settings'}
-            {activeTab === 'overview' && 'System Overview'}
-            {activeTab === 'team' && 'Team & Users'}
-            {activeTab === 'permissions' && 'Platform Permissions'}
+            {activeTab === 'overview' && 'Campus Overview & Telemetry'}
+            {activeTab === 'students' && 'Student Directory & Admissions'}
+            {activeTab === 'courses' && 'Academic Departments & Degree Programs'}
+            {activeTab === 'settings' && 'Institutional Settings'}
           </h1>
           <p className="text-xs text-slate-400 mt-1 truncate">
-            Signed in as <span className="text-slate-300 font-medium">{user?.email || 'akshatnanawati2704@gmail.com'}</span>
+            Administrator: <span className="text-slate-300 font-medium">{user?.email || 'akshatnanawati2704@gmail.com'}</span>
           </p>
         </div>
 
@@ -415,176 +462,15 @@ export default function App() {
           </div>
         )}
 
-        {/* --- SETTINGS TAB VIEW --- */}
-        {activeTab === 'settings' && (
-          <div className="space-y-6 max-w-4xl pb-24 md:pb-16">
-            {/* Main Configuration Card */}
-            <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl ${
-              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-slate-100'
-            }`}>
-              <div className="mb-6">
-                <h2 className="text-base sm:text-lg font-bold">Platform Settings</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Configure global portal behavior and restrictions</p>
-              </div>
-
-              <form onSubmit={handleSaveSettings} className="space-y-5">
-                <div>
-                  <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    PORTAL NAME
-                  </label>
-                  <input
-                    type="text"
-                    value={portalName}
-                    onChange={(e) => setPortalName(e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border text-sm font-medium outline-none transition ${
-                      theme === 'dark'
-                        ? 'bg-[#060813] border-slate-800/90 text-white focus:border-indigo-500'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-600'
-                    }`}
-                  />
-                </div>
-
-                <div className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border ${
-                  theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="pr-3">
-                    <div className="text-xs sm:text-sm font-bold">Public Registrations</div>
-                    <div className="text-[11px] sm:text-xs text-slate-400">Permit external visitors to sign up as Viewers</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={publicRegistrations}
-                    onChange={(e) => setPublicRegistrations(e.target.checked)}
-                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer shrink-0"
-                  />
-                </div>
-
-                <div className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border ${
-                  theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="pr-3">
-                    <div className="text-xs sm:text-sm font-bold">Maintenance Mode</div>
-                    <div className="text-[11px] sm:text-xs text-slate-400">Redirect non-admin visitors to an update screen</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={maintenanceMode}
-                    onChange={(e) => setMaintenanceMode(e.target.checked)}
-                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer shrink-0"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-                >
-                  Save Platform Settings
-                </button>
-              </form>
-            </div>
-
-            {/* Quick Actions & Working Controls Card */}
-            <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl space-y-5 ${
-              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
-            }`}>
-              <div>
-                <h2 className="text-base font-bold">Quick Actions & Preferences</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Control live session, visual theme, and system diagnostic operations</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 pt-2">
-                {/* Theme Toggle Button */}
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                    theme === 'dark'
-                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
-                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800 shadow-sm'
-                  }`}
-                >
-                  {theme === 'dark' ? (
-                    <>
-                      <Sun className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>Switch to Light Theme</span>
-                    </>
-                  ) : (
-                    <>
-                      <Moon className="w-4 h-4 text-indigo-600 shrink-0" />
-                      <span>Switch to Dark Theme</span>
-                    </>
-                  )}
-                </button>
-
-                {/* In-Settings Logout Button */}
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4 shrink-0" />
-                  <span>Log Out of Session</span>
-                </button>
-
-                {/* Clear Cache & Sync */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    loadData();
-                    setFeedback('Cache cleared & data synchronized with live server.');
-                    setTimeout(() => setFeedback(''), 3000);
-                  }}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                    theme === 'dark'
-                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
-                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
-                  }`}
-                >
-                  <RefreshCw className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span>Clear Cache & Sync</span>
-                </button>
-
-                {/* Export Audit Report */}
-                <button
-                  type="button"
-                  onClick={handleExportData}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                    theme === 'dark'
-                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
-                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
-                  }`}
-                >
-                  <Download className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Export Audit Report</span>
-                </button>
-
-                {/* System Ping */}
-                <button
-                  type="button"
-                  onClick={handlePingServer}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                    theme === 'dark'
-                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
-                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
-                  }`}
-                >
-                  <Activity className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>{healthStatus || 'Test API Ping'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- OVERVIEW TAB VIEW --- */}
+        {/* --- TAB 1: OVERVIEW DASHBOARD --- */}
         {activeTab === 'overview' && (
           <div className="space-y-6 md:space-y-8 max-w-6xl pb-24 md:pb-16">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
               {[
-                { label: 'Total Users', val: stats.totalUsers },
-                { label: 'Active Sessions', val: stats.activeUsers },
-                { label: 'Platform Admins', val: stats.totalAdmins },
-                { label: 'System Status', val: maintenanceMode ? 'Maintenance' : 'Optimal' }
+                { label: 'Total Enrolled Students', val: stats.totalUsers },
+                { label: 'Active Students', val: stats.activeUsers },
+                { label: 'Academic Programs', val: stats.totalAdmins },
+                { label: 'Academic Term', val: maintenanceMode ? 'Semester Freeze' : 'Active Semester' }
               ].map((card, i) => (
                 <div
                   key={i}
@@ -603,40 +489,44 @@ export default function App() {
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold">Recent Members</h2>
-                  <p className="text-xs text-slate-400">Latest active users onboarded to {portalName}</p>
+                  <h2 className="text-base sm:text-lg font-bold">Recently Enrolled Students</h2>
+                  <p className="text-xs text-slate-400">Newly matriculated students registered in the platform</p>
                 </div>
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add Member</span>
+                  <span>Enroll Student</span>
                 </button>
               </div>
 
-              {/* Responsive Table Wrapper */}
               <div className="overflow-x-auto -mx-2 sm:mx-0">
-                <table className="w-full text-left text-xs sm:text-sm min-w-[500px]">
+                <table className="w-full text-left text-xs sm:text-sm min-w-[550px]">
                   <thead>
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
-                      <th className="pb-3 px-2">Name</th>
-                      <th className="pb-3 px-2">Email</th>
-                      <th className="pb-3 px-2">Role</th>
+                      <th className="pb-3 px-2">Roll No</th>
+                      <th className="pb-3 px-2">Student Name</th>
+                      <th className="pb-3 px-2">Course / Degree</th>
+                      <th className="pb-3 px-2">Academic Year</th>
                       <th className="pb-3 px-2">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
-                    {users.slice(0, 4).map((u) => (
-                      <tr key={u.id}>
-                        <td className="py-3 px-2 font-semibold">{u.name}</td>
-                        <td className="py-3 px-2 text-slate-400">{u.email}</td>
-                        <td className="py-3 px-2">{u.role}</td>
+                    {students.slice(0, 4).map((s) => (
+                      <tr key={s.id}>
+                        <td className="py-3 px-2 font-mono text-indigo-400">{s.rollNo || `CS-2026-${s.id}`}</td>
+                        <td className="py-3 px-2 font-semibold">
+                          {s.name}
+                          <div className="text-[11px] text-slate-400 font-normal">{s.email}</div>
+                        </td>
+                        <td className="py-3 px-2 font-medium">{s.course || s.role}</td>
+                        <td className="py-3 px-2 text-slate-400">{s.year || '1st Year'}</td>
                         <td className="py-3 px-2">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                            u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
+                            s.status === 'Enrolled' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
                           }`}>
-                            {u.status}
+                            {s.status}
                           </span>
                         </td>
                       </tr>
@@ -648,60 +538,110 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TEAM & USERS TAB VIEW --- */}
-        {activeTab === 'team' && (
+        {/* --- TAB 2: STUDENT ROSTER (FULL DIRECTORY) --- */}
+        {activeTab === 'students' && (
           <div className="space-y-6 max-w-6xl pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold">Team Directory</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Manage administrative credentials and viewer permissions</p>
+                <h2 className="text-lg sm:text-xl font-bold">Student Directory</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Filter, search, and manage student admissions</p>
               </div>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Member</span>
+                <span>Enroll New Student</span>
               </button>
             </div>
 
+            {/* Filter Bar */}
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row gap-3 items-center justify-between ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Search by name, roll no, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border outline-none ${
+                    theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs text-slate-400">Degree:</span>
+                <select
+                  value={filterCourse}
+                  onChange={(e) => setFilterCourse(e.target.value)}
+                  className={`px-3 py-2 text-xs rounded-xl border outline-none cursor-pointer ${
+                    theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <option value="All">All Degrees</option>
+                  <option value="BCA">BCA</option>
+                  <option value="B.Tech CS">B.Tech CS</option>
+                  <option value="MCA">MCA</option>
+                  <option value="B.Sc IT">B.Sc IT</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Students Table */}
             <div className={`p-5 sm:p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
               <div className="overflow-x-auto -mx-2 sm:mx-0">
-                <table className="w-full text-left text-xs sm:text-sm min-w-[550px]">
+                <table className="w-full text-left text-xs sm:text-sm min-w-[650px]">
                   <thead>
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
-                      <th className="pb-3 px-2">Name</th>
-                      <th className="pb-3 px-2">Email</th>
-                      <th className="pb-3 px-2">Role</th>
+                      <th className="pb-3 px-2">Roll No</th>
+                      <th className="pb-3 px-2">Student</th>
+                      <th className="pb-3 px-2">Degree</th>
+                      <th className="pb-3 px-2">Year</th>
                       <th className="pb-3 px-2">Status</th>
-                      <th className="pb-3 px-2 text-right">Actions</th>
+                      <th className="pb-3 px-2 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
-                    {users.map((u) => (
-                      <tr key={u.id}>
-                        <td className="py-3 px-2 font-semibold">{u.name}</td>
-                        <td className="py-3 px-2 text-slate-400">{u.email}</td>
-                        <td className="py-3 px-2">{u.role}</td>
-                        <td className="py-3 px-2">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                            u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
-                          }`}>
-                            {u.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-right">
-                          <button
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
+                    {filteredStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="text-center py-6 text-slate-400 text-xs">
+                          No students found matching your criteria.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredStudents.map((s) => (
+                        <tr key={s.id}>
+                          <td className="py-3 px-2 font-mono text-indigo-400">{s.rollNo || `CS-2026-${s.id}`}</td>
+                          <td className="py-3 px-2 font-semibold">
+                            {s.name}
+                            <div className="text-[11px] text-slate-400 font-normal">{s.email}</div>
+                          </td>
+                          <td className="py-3 px-2 font-medium">{s.course || s.role}</td>
+                          <td className="py-3 px-2 text-slate-400">{s.year || '1st Year'}</td>
+                          <td className="py-3 px-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
+                              s.status === 'Enrolled' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            <button
+                              onClick={() => handleDeleteStudent(s.id)}
+                              className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                              title="Drop student record"
+                            >
+                              <Trash2 className="w-4 h-4 inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -709,55 +649,206 @@ export default function App() {
           </div>
         )}
 
-        {/* --- PERMISSIONS TAB VIEW --- */}
-        {activeTab === 'permissions' && (
+        {/* --- TAB 3: ACADEMIC DEPARTMENTS & DEGREES --- */}
+        {activeTab === 'courses' && (
           <div className="max-w-4xl space-y-6 pb-24 md:pb-16">
-            <div className={`p-5 sm:p-8 rounded-3xl border ${
+            <div className={`p-6 sm:p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
-              <h2 className="text-base sm:text-lg font-bold mb-2">Access Control Matrix</h2>
-              <p className="text-xs text-slate-400 mb-6">Default system role privileges and security policies</p>
-              
-              <div className="space-y-3">
+              <h2 className="text-lg font-bold mb-1">Academic Programs Offered</h2>
+              <p className="text-xs text-slate-400 mb-6">Accredited undergraduate and postgraduate programs</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { role: 'Admin', desc: 'Full write/read permissions, settings modification, user creation' },
-                  { role: 'Editor', desc: 'Can manage contents and view analytics; cannot alter platform settings' },
-                  { role: 'Viewer', desc: 'Read-only access across dashboard reporting endpoints' }
-                ].map((item, idx) => (
-                  <div key={idx} className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                  { name: 'BCA (Bachelor of Computer Applications)', sem: '6 Semesters', dept: 'Department of Computing', head: 'Dr. V. Sharma' },
+                  { name: 'B.Tech Computer Science & Engineering', sem: '8 Semesters', dept: 'School of Engineering', head: 'Prof. K. Sen' },
+                  { name: 'MCA (Master of Computer Applications)', sem: '4 Semesters', dept: 'Postgraduate Studies', head: 'Dr. A. Verma' },
+                  { name: 'B.Sc Information Technology', sem: '6 Semesters', dept: 'Applied Sciences', head: 'Prof. N. Patel' }
+                ].map((c, idx) => (
+                  <div key={idx} className={`p-4 rounded-2xl border space-y-2 ${
                     theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-200'
                   }`}>
-                    <div>
-                      <div className="text-sm font-bold text-indigo-400">{item.role}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{item.desc}</div>
-                    </div>
-                    <span className="self-start sm:self-auto text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
-                      Active Policy
-                    </span>
+                    <div className="text-sm font-bold text-indigo-400">{c.name}</div>
+                    <div className="text-xs text-slate-400">{c.dept} • {c.sem}</div>
+                    <div className="text-[11px] text-slate-500 font-medium">Head of Program: {c.head}</div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         )}
+
+        {/* --- TAB 4: ACADEMIC SETTINGS --- */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 max-w-4xl pb-24 md:pb-16">
+            <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-slate-100'
+            }`}>
+              <div className="mb-6">
+                <h2 className="text-base sm:text-lg font-bold">Academic Portal Configuration</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Control registration status and semester grade locks</p>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-5">
+                <div>
+                  <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    INSTITUTION / PORTAL TITLE
+                  </label>
+                  <input
+                    type="text"
+                    value={portalName}
+                    onChange={(e) => setPortalName(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-medium outline-none transition ${
+                      theme === 'dark'
+                        ? 'bg-[#060813] border-slate-800/90 text-white focus:border-indigo-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-600'
+                    }`}
+                  />
+                </div>
+
+                <div className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border ${
+                  theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="pr-3">
+                    <div className="text-xs sm:text-sm font-bold">Student Self-Registration</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400">Permit external applicants to register directly online</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={publicRegistrations}
+                    onChange={(e) => setPublicRegistrations(e.target.checked)}
+                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer shrink-0"
+                  />
+                </div>
+
+                <div className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border ${
+                  theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="pr-3">
+                    <div className="text-xs sm:text-sm font-bold">Semester Grade Freeze (Maintenance Mode)</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400">Lock grade updates and display term evaluation notification</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={maintenanceMode}
+                    onChange={(e) => setMaintenanceMode(e.target.checked)}
+                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer shrink-0"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                >
+                  Save Academic Settings
+                </button>
+              </form>
+            </div>
+
+            {/* Quick Action Diagnostic & Tools */}
+            <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl space-y-5 ${
+              theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <div>
+                <h2 className="text-base font-bold">Administrative Actions & Reports</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Session controls, theme customization, and data backups</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 pt-2">
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+                  <span>Switch Theme</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out of Session</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadData();
+                    setFeedback('Data synchronized with live database.');
+                    setTimeout(() => setFeedback(''), 3000);
+                  }}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  <RefreshCw className="w-4 h-4 text-indigo-400" />
+                  <span>Sync Campus Data</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportDirectory}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span>Export Student Roster</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePing}
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
+                      : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
+                  }`}
+                >
+                  <Activity className="w-4 h-4 text-cyan-400" />
+                  <span>{healthStatus || 'Test API Ping'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <span>Reset Sample Records</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* Responsive Add Member Modal */}
+      {/* --- ENROLL STUDENT MODAL --- */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md p-5 sm:p-6 rounded-3xl border shadow-2xl space-y-4 ${
+          <div className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 ${
             theme === 'dark' ? 'bg-[#090d1f] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
-            <h2 className="text-lg font-bold">Add New Member</h2>
-            <form onSubmit={handleAddMember} className="space-y-4">
+            <h2 className="text-lg font-bold">Enroll New Student</h2>
+            <form onSubmit={handleEnrollStudent} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Student Full Name</label>
                 <input
                   type="text"
                   required
-                  value={newMember.name}
-                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-                  placeholder="Jane Doe"
+                  value={newStudent.name}
+                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                  placeholder="Aarav Sharma"
                   className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
                     theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                   }`}
@@ -765,46 +856,62 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Email Address</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Institutional Email</label>
                 <input
                   type="email"
                   required
-                  value={newMember.email}
-                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                  placeholder="jane@example.com"
+                  value={newStudent.email}
+                  onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                  placeholder="aarav@campus.edu"
                   className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
                     theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                   }`}
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Roll No / Student ID (Optional)</label>
+                <input
+                  type="text"
+                  value={newStudent.rollNo}
+                  onChange={(e) => setNewStudent({ ...newStudent, rollNo: e.target.value })}
+                  placeholder="CS-2026-05"
+                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
+                    theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Role</label>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Program</label>
                   <select
-                    value={newMember.role}
-                    onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+                    value={newStudent.course}
+                    onChange={(e) => setNewStudent({ ...newStudent, course: e.target.value })}
                     className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
-                    <option value="Viewer">Viewer</option>
-                    <option value="Editor">Editor</option>
-                    <option value="Admin">Admin</option>
+                    <option value="BCA">BCA</option>
+                    <option value="B.Tech CS">B.Tech CS</option>
+                    <option value="MCA">MCA</option>
+                    <option value="B.Sc IT">B.Sc IT</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Status</label>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Year</label>
                   <select
-                    value={newMember.status}
-                    onChange={(e) => setNewMember({ ...newMember, status: e.target.value })}
+                    value={newStudent.year}
+                    onChange={(e) => setNewStudent({ ...newStudent, year: e.target.value })}
                     className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
                   </select>
                 </div>
               </div>
@@ -821,7 +928,7 @@ export default function App() {
                   type="submit"
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer"
                 >
-                  Add Member
+                  Complete Enrollment
                 </button>
               </div>
             </form>
