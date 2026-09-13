@@ -8,11 +8,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Your custom credentials from .env (with safe fallbacks)
+// Admin credentials from .env or production fallbacks
 const CUSTOM_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'akshatnanawati2704@gmail.com';
 const CUSTOM_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin2704';
 
-// Enable CORS for all incoming origins and methods
+// Enable CORS for all incoming requests
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -21,9 +21,9 @@ app.use(cors({
 
 app.use(express.json());
 
-// Root healthcheck route
+// Healthcheck route (visiting URL in browser confirms server is awake)
 app.get('/', (req, res) => {
-  res.send({ status: 'API is healthy and online' });
+  res.json({ status: 'API is healthy and online' });
 });
 
 // In-Memory Data Store
@@ -34,7 +34,7 @@ let users = [
   { id: '4', name: 'Sneha Patel', email: 'sneha@example.com', role: 'Editor', status: 'Active', joinedAt: '2025-04-10' }
 ];
 
-// Helper login handler
+// Unified Login Handler
 const handleLogin = (req, res) => {
   const { email, password } = req.body;
 
@@ -50,12 +50,13 @@ const handleLogin = (req, res) => {
     });
   }
 
-  return res.status(401).json({ error: 'Invalid custom credentials. Please check your email and password.' });
+  return res.status(401).json({ error: 'Invalid email or password.' });
 };
 
-// Accept login at both /api/auth/login AND /api/login to prevent path mismatches
+// Accept login on all common path variations to prevent 404s
 app.post('/api/auth/login', handleLogin);
 app.post('/api/login', handleLogin);
+app.post('/auth/login', handleLogin);
 
 // Dashboard Statistics
 app.get('/api/stats', (req, res) => {
@@ -71,12 +72,11 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-// Get All Users
+// User Management Routes
 app.get('/api/users', (req, res) => {
   res.json(users);
 });
 
-// Create User
 app.post('/api/users', (req, res) => {
   const { name, email, role, status } = req.body;
   if (!name || !email) {
@@ -96,7 +96,6 @@ app.post('/api/users', (req, res) => {
   res.status(201).json(newUser);
 });
 
-// Update User
 app.put('/api/users/:id', (req, res) => {
   const { id } = req.params;
   const { name, email, role, status } = req.body;
@@ -117,7 +116,6 @@ app.put('/api/users/:id', (req, res) => {
   res.json(users[index]);
 });
 
-// Delete User
 app.delete('/api/users/:id', (req, res) => {
   const { id } = req.params;
   users = users.filter(u => u.id !== id);
@@ -126,5 +124,5 @@ app.delete('/api/users/:id', (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
+  console.log(`Backend server running on port ${PORT}`);
 });
