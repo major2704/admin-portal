@@ -12,9 +12,11 @@ import {
   Activity, 
   Check, 
   Sparkles, 
-  ExternalLink,
-  Trash2,
-  Plus
+  ExternalLink, 
+  Trash2, 
+  Plus,
+  Menu,
+  X
 } from 'lucide-react';
 
 const API_BASE_URL = (
@@ -22,7 +24,7 @@ const API_BASE_URL = (
 ).replace(/\/$/, '');
 
 export default function App() {
-  // Authentication & Persistent State
+  // Authentication & Session Persistence
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('nexus_user');
@@ -34,6 +36,7 @@ export default function App() {
 
   const [theme, setTheme] = useState(() => localStorage.getItem('nexus_theme') || 'dark');
   const [activeTab, setActiveTab] = useState('settings'); // 'overview' | 'team' | 'permissions' | 'settings'
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Settings State
   const [portalName, setPortalName] = useState('NexusAdmin');
@@ -54,7 +57,7 @@ export default function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Viewer', status: 'Active' });
 
-  // Theme synchronization
+  // Theme Sync
   useEffect(() => {
     localStorage.setItem('nexus_theme', theme);
     const root = document.documentElement;
@@ -67,7 +70,7 @@ export default function App() {
     }
   }, [theme]);
 
-  // Initial load
+  // Initial Load
   useEffect(() => {
     if (user) {
       loadData();
@@ -195,27 +198,34 @@ export default function App() {
     }
   };
 
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'team', label: 'Team & Users', icon: Users },
+    { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
   // --- Login View ---
   if (!user) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${
+      <div className={`min-h-screen flex items-center justify-center p-4 sm:p-6 transition-colors ${
         theme === 'dark' ? 'bg-[#060813] text-white' : 'bg-slate-100 text-slate-900'
       }`}>
-        <div className={`w-full max-w-md p-8 rounded-2xl border shadow-2xl ${
+        <div className={`w-full max-w-md p-6 sm:p-8 rounded-3xl border shadow-2xl ${
           theme === 'dark' ? 'bg-[#0d1024] border-slate-800' : 'bg-white border-slate-200 shadow-slate-200'
         }`}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
+            <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">{portalName}</h1>
-              <p className="text-xs text-indigo-400 font-semibold tracking-wider uppercase">ENTERPRISE</p>
+              <p className="text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">ENTERPRISE</p>
             </div>
           </div>
 
           {authError && (
-            <div className="mb-4 p-3 rounded-lg text-xs bg-red-500/10 border border-red-500/30 text-red-400">
+            <div className="mb-4 p-3 rounded-xl text-xs bg-red-500/10 border border-red-500/30 text-red-400">
               {authError}
             </div>
           )}
@@ -229,7 +239,7 @@ export default function App() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="akshatnanawati2704@gmail.com"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none ${
+                className={`w-full px-4 py-3 rounded-xl border text-sm outline-none transition ${
                   theme === 'dark' ? 'bg-[#070a18] border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
                 }`}
               />
@@ -243,7 +253,7 @@ export default function App() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none ${
+                className={`w-full px-4 py-3 rounded-xl border text-sm outline-none transition ${
                   theme === 'dark' ? 'bg-[#070a18] border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
                 }`}
               />
@@ -252,7 +262,7 @@ export default function App() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 cursor-pointer"
             >
               {authLoading ? 'Verifying...' : 'Sign In to Enterprise'}
             </button>
@@ -262,21 +272,59 @@ export default function App() {
     );
   }
 
-  // --- Main Dashboard & Settings Screen ---
+  // --- Main Dashboard Screen ---
   return (
-    <div className={`min-h-screen flex font-sans transition-colors duration-200 relative ${
+    <div className={`min-h-screen flex flex-col md:flex-row font-sans transition-colors duration-200 relative ${
       theme === 'dark' ? 'bg-[#060813] text-slate-100' : 'bg-[#f4f6fb] text-slate-900'
     }`}>
-      {/* Sidebar */}
-      <aside className={`w-72 border-r flex flex-col justify-between p-6 select-none shrink-0 ${
-        theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
+      {/* Mobile Top App Bar */}
+      <div className={`md:hidden flex items-center justify-between p-4 border-b sticky top-0 z-30 ${
+        theme === 'dark' ? 'bg-[#090d1f] border-slate-800' : 'bg-white border-slate-200'
       }`}>
+        <button 
+          onClick={() => setActiveTab('overview')} 
+          className="flex items-center gap-2.5 text-left focus:outline-none"
+        >
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-sm font-bold tracking-tight">{portalName}</div>
+            <div className="text-[9px] font-bold text-indigo-400 tracking-wider">ENTERPRISE</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className={`p-2 rounded-xl border transition ${
+            theme === 'dark' ? 'border-slate-800 bg-slate-900 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'
+          }`}
+        >
+          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* Mobile Overlay Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)} 
+          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity" 
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 p-6 flex flex-col justify-between border-r select-none transition-transform duration-300 ease-in-out
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'}
+        md:static md:shrink-0
+      `}>
         <div className="space-y-8">
-          {/* Logo & Portal Name: Clicking navigates to Overview */}
+          {/* Logo & Portal Name */}
           <button 
             type="button" 
-            onClick={() => setActiveTab('overview')}
-            className="flex items-center gap-3 group text-left w-full focus:outline-none"
+            onClick={() => { setActiveTab('overview'); setMobileMenuOpen(false); }}
+            className="flex items-center gap-3 group text-left w-full focus:outline-none cursor-pointer"
             title="Click to go to Overview Dashboard"
           >
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
@@ -294,19 +342,14 @@ export default function App() {
 
           {/* Navigation Links */}
           <nav className="space-y-2">
-            {[
-              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-              { id: 'team', label: 'Team & Users', icon: Users },
-              { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
-              { id: 'settings', label: 'Settings', icon: Settings },
-            ].map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+                  onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#181a38] text-indigo-400 border border-indigo-500/30 shadow-inner'
                       : theme === 'dark'
@@ -322,72 +365,71 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Space reserved at the bottom of the sidebar to prevent overlap */}
-        <div className="h-20" />
+        {/* Space reserved so floating card doesn't cover content on desktop */}
+        <div className="hidden md:block h-20" />
       </aside>
 
-      {/* Floating Master Admin Profile Card (Stays in place when scrolling) */}
-      <div className={`fixed bottom-6 left-6 z-40 w-60 p-3.5 rounded-2xl border flex items-center justify-between shadow-2xl backdrop-blur-md transition-all ${
+      {/* Floating Master Admin Profile Card */}
+      <div className={`fixed bottom-4 left-4 md:bottom-6 md:left-6 z-40 w-56 md:w-60 p-3 md:p-3.5 rounded-2xl border flex items-center justify-between shadow-2xl backdrop-blur-md transition-all ${
         theme === 'dark'
           ? 'bg-[#0e122b]/95 border-slate-800/90 shadow-black/60'
           : 'bg-white/95 border-slate-200 shadow-slate-300'
       }`}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shadow-indigo-500/30">
+        <div className="flex items-center gap-2.5 md:gap-3 overflow-hidden">
+          <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
             MA
           </div>
-          <div className="text-left">
-            <div className="text-xs font-bold leading-tight">Master Admin</div>
+          <div className="text-left truncate">
+            <div className="text-xs font-bold leading-tight truncate">Master Admin</div>
             <div className="text-[10px] text-slate-400">Admin</div>
           </div>
         </div>
         <button 
           onClick={handleLogout}
           title="Log Out"
-          className="text-slate-400 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-slate-800/40"
+          className="text-slate-400 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-slate-800/40 shrink-0 cursor-pointer"
         >
           <ExternalLink className="w-4 h-4" />
         </button>
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-10 overflow-y-auto">
+      <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto w-full">
         {/* Top Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
             {activeTab === 'settings' && 'Platform Settings'}
             {activeTab === 'overview' && 'System Overview'}
             {activeTab === 'team' && 'Team & Users'}
             {activeTab === 'permissions' && 'Platform Permissions'}
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-1 truncate">
             Signed in as <span className="text-slate-300 font-medium">{user?.email || 'akshatnanawati2704@gmail.com'}</span>
           </p>
         </div>
 
         {feedback && (
-          <div className="mb-6 p-4 rounded-xl text-xs font-semibold bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center gap-2">
-            <Check className="w-4 h-4" />
-            {feedback}
+          <div className="mb-6 p-3.5 sm:p-4 rounded-2xl text-xs font-semibold bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center gap-2">
+            <Check className="w-4 h-4 shrink-0" />
+            <span>{feedback}</span>
           </div>
         )}
 
         {/* --- SETTINGS TAB VIEW --- */}
         {activeTab === 'settings' && (
-          <div className="space-y-6 max-w-4xl pb-16">
+          <div className="space-y-6 max-w-4xl pb-24 md:pb-16">
             {/* Main Configuration Card */}
-            <div className={`p-8 rounded-3xl border shadow-xl ${
+            <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-slate-100'
             }`}>
               <div className="mb-6">
-                <h2 className="text-lg font-bold">Platform Settings</h2>
+                <h2 className="text-base sm:text-lg font-bold">Platform Settings</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Configure global portal behavior and restrictions</p>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-5">
-                {/* Portal Name Input */}
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     PORTAL NAME
                   </label>
                   <input
@@ -402,42 +444,39 @@ export default function App() {
                   />
                 </div>
 
-                {/* Public Registrations Toggle */}
-                <div className={`flex items-center justify-between p-4 rounded-2xl border ${
+                <div className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border ${
                   theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <div>
-                    <div className="text-sm font-bold">Public Registrations</div>
-                    <div className="text-xs text-slate-400">Permit external visitors to sign up as Viewers</div>
+                  <div className="pr-3">
+                    <div className="text-xs sm:text-sm font-bold">Public Registrations</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400">Permit external visitors to sign up as Viewers</div>
                   </div>
                   <input
                     type="checkbox"
                     checked={publicRegistrations}
                     onChange={(e) => setPublicRegistrations(e.target.checked)}
-                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer"
+                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer shrink-0"
                   />
                 </div>
 
-                {/* Maintenance Mode Toggle */}
-                <div className={`flex items-center justify-between p-4 rounded-2xl border ${
+                <div className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border ${
                   theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <div>
-                    <div className="text-sm font-bold">Maintenance Mode</div>
-                    <div className="text-xs text-slate-400">Redirect non-admin visitors to an update screen</div>
+                  <div className="pr-3">
+                    <div className="text-xs sm:text-sm font-bold">Maintenance Mode</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400">Redirect non-admin visitors to an update screen</div>
                   </div>
                   <input
                     type="checkbox"
                     checked={maintenanceMode}
                     onChange={(e) => setMaintenanceMode(e.target.checked)}
-                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer"
+                    className="w-5 h-5 rounded accent-indigo-600 cursor-pointer shrink-0"
                   />
                 </div>
 
-                {/* Save Platform Settings Button */}
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.01]"
+                  className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
                 >
                   Save Platform Settings
                 </button>
@@ -445,7 +484,7 @@ export default function App() {
             </div>
 
             {/* Quick Actions & Working Controls Card */}
-            <div className={`p-8 rounded-3xl border shadow-xl space-y-5 ${
+            <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl space-y-5 ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
               <div>
@@ -453,12 +492,12 @@ export default function App() {
                 <p className="text-xs text-slate-400 mt-0.5">Control live session, visual theme, and system diagnostic operations</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-                {/* 1. Theme Toggle with Icon */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 pt-2">
+                {/* Theme Toggle Button */}
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                     theme === 'dark'
                       ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
                       : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800 shadow-sm'
@@ -466,28 +505,28 @@ export default function App() {
                 >
                   {theme === 'dark' ? (
                     <>
-                      <Sun className="w-4 h-4 text-amber-400" />
+                      <Sun className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>Switch to Light Theme</span>
                     </>
                   ) : (
                     <>
-                      <Moon className="w-4 h-4 text-indigo-600" />
+                      <Moon className="w-4 h-4 text-indigo-600 shrink-0" />
                       <span>Switch to Dark Theme</span>
                     </>
                   )}
                 </button>
 
-                {/* 2. Login / Logout Action Button with Icon */}
+                {/* In-Settings Logout Button */}
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all cursor-pointer"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 shrink-0" />
                   <span>Log Out of Session</span>
                 </button>
 
-                {/* 3. Clear Cache & Refresh Data */}
+                {/* Clear Cache & Sync */}
                 <button
                   type="button"
                   onClick={() => {
@@ -495,41 +534,41 @@ export default function App() {
                     setFeedback('Cache cleared & data synchronized with live server.');
                     setTimeout(() => setFeedback(''), 3000);
                   }}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                     theme === 'dark'
                       ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
                       : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
                   }`}
                 >
-                  <RefreshCw className="w-4 h-4 text-indigo-400" />
+                  <RefreshCw className="w-4 h-4 text-indigo-400 shrink-0" />
                   <span>Clear Cache & Sync</span>
                 </button>
 
-                {/* 4. Export Platform Audit Report */}
+                {/* Export Audit Report */}
                 <button
                   type="button"
                   onClick={handleExportData}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                     theme === 'dark'
                       ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
                       : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
                   }`}
                 >
-                  <Download className="w-4 h-4 text-emerald-400" />
+                  <Download className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Export Audit Report</span>
                 </button>
 
-                {/* 5. System Health Diagnostic Ping */}
+                {/* System Ping */}
                 <button
                   type="button"
                   onClick={handlePingServer}
-                  className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl border text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                     theme === 'dark'
                       ? 'bg-[#060813] border-slate-800 hover:border-indigo-500/50 text-white'
                       : 'bg-slate-50 border-slate-200 hover:border-indigo-500 text-slate-800'
                   }`}
                 >
-                  <Activity className="w-4 h-4 text-cyan-400" />
+                  <Activity className="w-4 h-4 text-cyan-400 shrink-0" />
                   <span>{healthStatus || 'Test API Ping'}</span>
                 </button>
               </div>
@@ -539,8 +578,8 @@ export default function App() {
 
         {/* --- OVERVIEW TAB VIEW --- */}
         {activeTab === 'overview' && (
-          <div className="space-y-8 max-w-6xl pb-16">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-6 md:space-y-8 max-w-6xl pb-24 md:pb-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
               {[
                 { label: 'Total Users', val: stats.totalUsers },
                 { label: 'Active Sessions', val: stats.activeUsers },
@@ -549,51 +588,52 @@ export default function App() {
               ].map((card, i) => (
                 <div
                   key={i}
-                  className={`p-6 rounded-3xl border transition-all ${
+                  className={`p-5 sm:p-6 rounded-3xl border transition-all ${
                     theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
                   }`}
                 >
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{card.label}</div>
-                  <div className="text-3xl font-extrabold mt-3 text-indigo-400">{card.val}</div>
+                  <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">{card.label}</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold mt-2 sm:mt-3 text-indigo-400">{card.val}</div>
                 </div>
               ))}
             </div>
 
-            <div className={`p-8 rounded-3xl border ${
+            <div className={`p-5 sm:p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
             }`}>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h2 className="text-lg font-bold">Recent Members</h2>
+                  <h2 className="text-base sm:text-lg font-bold">Recent Members</h2>
                   <p className="text-xs text-slate-400">Latest active users onboarded to {portalName}</p>
                 </div>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Member</span>
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+              {/* Responsive Table Wrapper */}
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="w-full text-left text-xs sm:text-sm min-w-[500px]">
                   <thead>
-                    <tr className="border-b border-slate-800/60 text-slate-400 text-xs uppercase font-bold">
-                      <th className="pb-3">Name</th>
-                      <th className="pb-3">Email</th>
-                      <th className="pb-3">Role</th>
-                      <th className="pb-3">Status</th>
+                    <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
+                      <th className="pb-3 px-2">Name</th>
+                      <th className="pb-3 px-2">Email</th>
+                      <th className="pb-3 px-2">Role</th>
+                      <th className="pb-3 px-2">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
                     {users.slice(0, 4).map((u) => (
                       <tr key={u.id}>
-                        <td className="py-3.5 font-semibold">{u.name}</td>
-                        <td className="py-3.5 text-slate-400">{u.email}</td>
-                        <td className="py-3.5">{u.role}</td>
-                        <td className="py-3.5">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        <td className="py-3 px-2 font-semibold">{u.name}</td>
+                        <td className="py-3 px-2 text-slate-400">{u.email}</td>
+                        <td className="py-3 px-2">{u.role}</td>
+                        <td className="py-3 px-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
                             u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
                           }`}>
                             {u.status}
@@ -610,54 +650,54 @@ export default function App() {
 
         {/* --- TEAM & USERS TAB VIEW --- */}
         {activeTab === 'team' && (
-          <div className="space-y-6 max-w-6xl pb-16">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6 max-w-6xl pb-24 md:pb-16">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold">Team Directory</h2>
+                <h2 className="text-lg sm:text-xl font-bold">Team Directory</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Manage administrative credentials and viewer permissions</p>
               </div>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Member</span>
               </button>
             </div>
 
-            <div className={`p-8 rounded-3xl border ${
+            <div className={`p-5 sm:p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="w-full text-left text-xs sm:text-sm min-w-[550px]">
                   <thead>
-                    <tr className="border-b border-slate-800/60 text-slate-400 text-xs uppercase font-bold">
-                      <th className="pb-3">Name</th>
-                      <th className="pb-3">Email</th>
-                      <th className="pb-3">Role</th>
-                      <th className="pb-3">Status</th>
-                      <th className="pb-3 text-right">Actions</th>
+                    <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
+                      <th className="pb-3 px-2">Name</th>
+                      <th className="pb-3 px-2">Email</th>
+                      <th className="pb-3 px-2">Role</th>
+                      <th className="pb-3 px-2">Status</th>
+                      <th className="pb-3 px-2 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
                     {users.map((u) => (
                       <tr key={u.id}>
-                        <td className="py-3.5 font-semibold">{u.name}</td>
-                        <td className="py-3.5 text-slate-400">{u.email}</td>
-                        <td className="py-3.5">{u.role}</td>
-                        <td className="py-3.5">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        <td className="py-3 px-2 font-semibold">{u.name}</td>
+                        <td className="py-3 px-2 text-slate-400">{u.email}</td>
+                        <td className="py-3 px-2">{u.role}</td>
+                        <td className="py-3 px-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
                             u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
                           }`}>
                             {u.status}
                           </span>
                         </td>
-                        <td className="py-3.5 text-right">
+                        <td className="py-3 px-2 text-right">
                           <button
                             onClick={() => handleDeleteUser(u.id)}
-                            className="text-red-400 hover:text-red-300 p-1"
+                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 inline" />
                           </button>
                         </td>
                       </tr>
@@ -671,11 +711,11 @@ export default function App() {
 
         {/* --- PERMISSIONS TAB VIEW --- */}
         {activeTab === 'permissions' && (
-          <div className="max-w-4xl space-y-6 pb-16">
-            <div className={`p-8 rounded-3xl border ${
+          <div className="max-w-4xl space-y-6 pb-24 md:pb-16">
+            <div className={`p-5 sm:p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
-              <h2 className="text-lg font-bold mb-2">Access Control Matrix</h2>
+              <h2 className="text-base sm:text-lg font-bold mb-2">Access Control Matrix</h2>
               <p className="text-xs text-slate-400 mb-6">Default system role privileges and security policies</p>
               
               <div className="space-y-3">
@@ -684,14 +724,14 @@ export default function App() {
                   { role: 'Editor', desc: 'Can manage contents and view analytics; cannot alter platform settings' },
                   { role: 'Viewer', desc: 'Read-only access across dashboard reporting endpoints' }
                 ].map((item, idx) => (
-                  <div key={idx} className={`p-4 rounded-2xl border flex items-center justify-between ${
+                  <div key={idx} className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                     theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-200'
                   }`}>
                     <div>
                       <div className="text-sm font-bold text-indigo-400">{item.role}</div>
                       <div className="text-xs text-slate-400 mt-0.5">{item.desc}</div>
                     </div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+                    <span className="self-start sm:self-auto text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
                       Active Policy
                     </span>
                   </div>
@@ -702,10 +742,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Add Member Modal */}
+      {/* Responsive Add Member Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 ${
+          <div className={`w-full max-w-md p-5 sm:p-6 rounded-3xl border shadow-2xl space-y-4 ${
             theme === 'dark' ? 'bg-[#090d1f] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             <h2 className="text-lg font-bold">Add New Member</h2>
@@ -718,7 +758,7 @@ export default function App() {
                   value={newMember.name}
                   onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
                   placeholder="Jane Doe"
-                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
+                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
                     theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                   }`}
                 />
@@ -732,20 +772,20 @@ export default function App() {
                   value={newMember.email}
                   onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
                   placeholder="jane@example.com"
-                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
+                  className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
                     theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                   }`}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Role</label>
                   <select
                     value={newMember.role}
                     onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
-                    className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
+                    className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
                     <option value="Viewer">Viewer</option>
@@ -759,8 +799,8 @@ export default function App() {
                   <select
                     value={newMember.status}
                     onChange={(e) => setNewMember({ ...newMember, status: e.target.value })}
-                    className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
+                    className={`w-full px-3 py-2 text-sm border rounded-xl outline-none transition ${
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
                     <option value="Active">Active</option>
@@ -773,13 +813,13 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer"
                 >
                   Add Member
                 </button>
