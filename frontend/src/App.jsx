@@ -69,7 +69,7 @@ export default function App() {
     name: '',
     email: '',
     rollNo: '',
-    role: 'BCA',
+    role: 'Viewer',
     status: 'Enrolled'
   });
 
@@ -82,8 +82,8 @@ export default function App() {
     head: ''
   });
 
-  // Helper to check if role is staff
-  const isStaffRole = (role) => role === 'Admin' || role === 'Teacher';
+  // Roll Number is NOT applicable ONLY for ADMIN and TEACHER
+  const isRollNoDisabled = (role) => role === 'Admin' || role === 'Teacher';
 
   // Apply Theme
   useEffect(() => {
@@ -211,11 +211,11 @@ export default function App() {
   const handleProvisionUser = async (e) => {
     e.preventDefault();
     try {
-      const isStaff = isStaffRole(newStudent.role);
-      
-      // If staff (Admin/Teacher), assign empty or null rollNo. Otherwise use manual input or fallback.
+      const noRollNo = isRollNoDisabled(newStudent.role);
+
+      // Only Admin and Teacher are exempted from having a Roll No
       let finalRollNo = '';
-      if (!isStaff) {
+      if (!noRollNo) {
         finalRollNo = newStudent.rollNo.trim() || `CS-2026-${Math.floor(10 + Math.random() * 90)}`;
       }
 
@@ -238,7 +238,7 @@ export default function App() {
       if (res.ok) {
         setStudents([data, ...students]);
         setShowAddModal(false);
-        setNewStudent({ name: '', email: '', rollNo: '', role: courses[0]?.code || 'BCA', status: 'Enrolled' });
+        setNewStudent({ name: '', email: '', rollNo: '', role: 'Viewer', status: 'Enrolled' });
         loadData();
       }
     } catch (err) {
@@ -593,8 +593,8 @@ export default function App() {
                     {students.slice(0, 4).map((s) => (
                       <tr key={s.id}>
                         <td className="py-3 px-2 font-mono text-indigo-400">
-                          {isStaffRole(s.role) ? (
-                            <span className="text-slate-500 text-xs">STAFF</span>
+                          {isRollNoDisabled(s.role) ? (
+                            <span className="text-slate-500 text-xs italic tracking-wider">—</span>
                           ) : (
                             s.rollNo || `CS-2026-${s.id}`
                           )}
@@ -639,7 +639,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Filter Bar: ALL | ADMIN | TEACHER | ENROLLED | ON LEAVE */}
+            {/* Filter Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -709,8 +709,8 @@ export default function App() {
                       filteredStudents.map((s) => (
                         <tr key={s.id}>
                           <td className="py-3 px-2 font-mono text-indigo-400">
-                            {isStaffRole(s.role) ? (
-                              <span className="text-slate-500 text-xs italic tracking-wider">STAFF</span>
+                            {isRollNoDisabled(s.role) ? (
+                              <span className="text-slate-500 text-xs italic tracking-wider">—</span>
                             ) : (
                               s.rollNo || `CS-2026-${s.id}`
                             )}
@@ -1082,7 +1082,7 @@ export default function App() {
 
             <div className="mb-6">
               <h2 className="text-xl font-bold tracking-tight text-white">Provision New User</h2>
-              <p className="text-xs text-slate-400 mt-1">Assign directory privileges and student details</p>
+              <p className="text-xs text-slate-400 mt-1">Assign directory privileges and account details</p>
             </div>
 
             <form onSubmit={handleProvisionUser} className="space-y-4">
@@ -1116,9 +1116,9 @@ export default function App() {
                 />
               </div>
 
-              {/* Role and Status Dropdown Row */}
+              {/* Dropdown Row */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Dropdown 1: Role / Degree */}
+                {/* Dropdown 1: Role / Degree (Includes Admin, Teacher, Viewer, Editor + Degrees) */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     ROLE / DEGREE
@@ -1134,16 +1134,18 @@ export default function App() {
                       backgroundSize: '1em'
                     }}
                   >
-                    <optgroup label="Academic Degrees / Programs" className="bg-[#0c1021] text-indigo-400 font-semibold">
+                    <optgroup label="System Roles" className="bg-[#0c1021] text-indigo-400 font-semibold">
+                      <option value="Admin" className="bg-[#0c1021] text-slate-100 font-normal">Admin</option>
+                      <option value="Teacher" className="bg-[#0c1021] text-slate-100 font-normal">Teacher</option>
+                      <option value="Viewer" className="bg-[#0c1021] text-slate-100 font-normal">Viewer</option>
+                      <option value="Editor" className="bg-[#0c1021] text-slate-100 font-normal">Editor</option>
+                    </optgroup>
+                    <optgroup label="Academic Degrees" className="bg-[#0c1021] text-indigo-400 font-semibold">
                       {courses.map((c) => (
                         <option key={c.id} value={c.code} className="bg-[#0c1021] text-slate-100 font-normal">
                           {c.code} ({c.name})
                         </option>
                       ))}
-                    </optgroup>
-                    <optgroup label="Staff & Administration" className="bg-[#0c1021] text-indigo-400 font-semibold">
-                      <option value="Admin" className="bg-[#0c1021] text-slate-100 font-normal">Admin</option>
-                      <option value="Teacher" className="bg-[#0c1021] text-slate-100 font-normal">Teacher</option>
                     </optgroup>
                   </select>
                 </div>
@@ -1171,19 +1173,19 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Manual Roll Number Field (Hidden or Disabled if Admin/Teacher) */}
+              {/* Roll Number Field: Enabled for Viewer, Editor, and Degrees. Disabled ONLY for Admin and Teacher */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  ROLL NUMBER {isStaffRole(newStudent.role) ? '(NOT APPLICABLE FOR STAFF)' : '(CUSTOM ASSIGNMENT)'}
+                  ROLL NUMBER {isRollNoDisabled(newStudent.role) ? '(NOT APPLICABLE FOR STAFF)' : '(CUSTOM ASSIGNMENT)'}
                 </label>
                 <input
                   type="text"
-                  disabled={isStaffRole(newStudent.role)}
-                  value={isStaffRole(newStudent.role) ? 'N/A (Staff Role)' : newStudent.rollNo}
+                  disabled={isRollNoDisabled(newStudent.role)}
+                  value={isRollNoDisabled(newStudent.role) ? 'Not Applicable (Staff)' : newStudent.rollNo}
                   onChange={(e) => setNewStudent({ ...newStudent, rollNo: e.target.value })}
                   placeholder="e.g. CS-2026-05 or 24BCA101"
                   className={`w-full px-4 py-3 rounded-xl border text-sm transition outline-none ${
-                    isStaffRole(newStudent.role)
+                    isRollNoDisabled(newStudent.role)
                       ? 'bg-slate-900/50 border-slate-800/40 text-slate-600 cursor-not-allowed italic'
                       : 'bg-[#060813] border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 font-mono'
                   }`}
