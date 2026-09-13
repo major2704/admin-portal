@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  GraduationCap, 
+  Building2, 
   Users, 
   BookOpen, 
   Settings, 
@@ -16,7 +16,8 @@ import {
   Search, 
   Menu, 
   X,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 
 const API_BASE_URL = (
@@ -38,8 +39,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('students'); // 'overview' | 'students' | 'courses' | 'settings'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Platform & Academic Settings
-  const [portalName, setPortalName] = useState('EduNexus SMS');
+  // Platform & Enterprise Settings
+  const [portalName, setPortalName] = useState('NexusAdmin Enterprise');
   const [publicRegistrations, setPublicRegistrations] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -59,7 +60,7 @@ export default function App() {
     { id: '3', code: 'MCA', name: 'Master of Computer Applications', duration: '4 Semesters', dept: 'Postgraduate Studies', head: 'Dr. A. Verma' },
     { id: '4', code: 'B.Sc IT', name: 'B.Sc Information Technology', duration: '6 Semesters', dept: 'Applied Sciences', head: 'Prof. N. Patel' }
   ]);
-  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 4, systemStatus: 'Academic Term Active' });
+  const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 4, systemStatus: 'Enterprise Operational' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
 
@@ -78,11 +79,11 @@ export default function App() {
     code: '',
     name: '',
     duration: '6 Semesters',
-    dept: 'Department of Computing',
+    dept: 'Enterprise Operations',
     head: ''
   });
 
-  // Roll Number is NOT applicable ONLY for ADMIN and TEACHER
+  // Roll Number is NOT applicable ONLY for Admin and Teacher
   const isRollNoDisabled = (role) => role === 'Admin' || role === 'Teacher';
 
   // Apply Theme
@@ -127,7 +128,7 @@ export default function App() {
         if (typeof sData.maintenanceMode === 'boolean') setMaintenanceMode(sData.maintenanceMode);
       }
     } catch (err) {
-      console.error('Sync failed:', err);
+      console.error('Enterprise data sync failed:', err);
     }
   };
 
@@ -144,7 +145,7 @@ export default function App() {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json().catch(() => ({ error: 'Server response error' }));
+      const data = await res.json().catch(() => ({ error: 'Invalid response from enterprise server' }));
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
       localStorage.setItem('nexus_token', data.token);
@@ -167,7 +168,7 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Course Actions
+  // Program / Degree Actions
   const handleAddCourse = async (e) => {
     e.preventDefault();
     try {
@@ -181,15 +182,15 @@ export default function App() {
       if (res.ok) {
         setCourses([...courses, data]);
         setShowCourseModal(false);
-        setNewCourse({ code: '', name: '', duration: '6 Semesters', dept: 'Department of Computing', head: '' });
-        setFeedback(`Program "${data.code}" added successfully.`);
+        setNewCourse({ code: '', name: '', duration: '6 Semesters', dept: 'Enterprise Operations', head: '' });
+        setFeedback(`Program "${data.code}" registered.`);
         setTimeout(() => setFeedback(''), 3000);
         loadData();
       } else {
-        alert(data.error || 'Failed to add course');
+        alert(data.error || 'Failed to add program');
       }
     } catch (err) {
-      console.error('Course add error:', err);
+      console.error('Course creation error:', err);
     }
   };
 
@@ -203,20 +204,20 @@ export default function App() {
         loadData();
       }
     } catch (err) {
-      console.error('Failed to delete course:', err);
+      console.error('Failed to remove program:', err);
     }
   };
 
-  // Student / User Actions
+  // Member / Student Actions
   const handleProvisionUser = async (e) => {
     e.preventDefault();
     try {
       const noRollNo = isRollNoDisabled(newStudent.role);
 
-      // Only Admin and Teacher are exempted from having a Roll No
+      // Only Admin and Teacher are exempt from Roll Number
       let finalRollNo = '';
       if (!noRollNo) {
-        finalRollNo = newStudent.rollNo.trim() || `CS-2026-${Math.floor(10 + Math.random() * 90)}`;
+        finalRollNo = newStudent.rollNo.trim() || `ENT-2026-${Math.floor(10 + Math.random() * 90)}`;
       }
 
       const payload = {
@@ -242,12 +243,12 @@ export default function App() {
         loadData();
       }
     } catch (err) {
-      console.error('Student add error:', err);
+      console.error('User provisioning error:', err);
     }
   };
 
   const handleDeleteStudent = async (id) => {
-    if (!window.confirm('Delete this record?')) return;
+    if (!window.confirm('Delete this directory record?')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/students/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -268,7 +269,7 @@ export default function App() {
         body: JSON.stringify({ portalName, publicRegistrations, maintenanceMode, theme })
       });
       if (res.ok) {
-        setFeedback('Settings updated successfully.');
+        setFeedback('Enterprise settings saved.');
         setTimeout(() => setFeedback(''), 3000);
       }
     } catch (err) {
@@ -283,10 +284,10 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${portalName.toLowerCase().replace(/\s+/g, '-')}-roster.json`;
+    link.download = `${portalName.toLowerCase().replace(/\s+/g, '-')}-audit.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setFeedback('Data export generated.');
+    setFeedback('Enterprise audit exported.');
     setTimeout(() => setFeedback(''), 3000);
   };
 
@@ -295,7 +296,7 @@ export default function App() {
     const t0 = Date.now();
     try {
       const res = await fetch(`${API_BASE_URL}/stats`);
-      setHealthStatus(res.ok ? `Online (${Date.now() - t0}ms)` : 'Error');
+      setHealthStatus(res.ok ? `Operational (${Date.now() - t0}ms)` : 'Degraded');
     } catch {
       setHealthStatus('Offline');
     }
@@ -303,15 +304,15 @@ export default function App() {
   };
 
   const handleReset = async () => {
-    if (!window.confirm('Reset all courses, records, and settings to factory defaults?')) return;
+    if (!window.confirm('Reset database to enterprise defaults?')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/reset`, { method: 'POST' });
       if (res.ok) {
-        alert('Database restored.');
+        alert('Enterprise records reset.');
         window.location.reload();
       }
     } catch (err) {
-      alert('Reset error: ' + err.message);
+      alert('Reset failed: ' + err.message);
     }
   };
 
@@ -336,13 +337,13 @@ export default function App() {
   }, [students, searchQuery, selectedFilter]);
 
   const navItems = [
-    { id: 'overview', label: 'Dashboard', icon: GraduationCap },
-    { id: 'students', label: 'Students Roster', icon: Users },
-    { id: 'courses', label: 'Departments & Degrees', icon: BookOpen },
-    { id: 'settings', label: 'Academic Settings', icon: Settings },
+    { id: 'overview', label: 'Enterprise Overview', icon: Building2 },
+    { id: 'students', label: 'Members & Roster', icon: Users },
+    { id: 'courses', label: 'Programs & Units', icon: BookOpen },
+    { id: 'settings', label: 'Platform Controls', icon: Settings },
   ];
 
-  // --- Auth Screen ---
+  // --- Auth View ---
   if (!user) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${
@@ -353,11 +354,11 @@ export default function App() {
         }`}>
           <div className="flex items-center gap-3 mb-6">
             <div className="p-3 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
-              <GraduationCap className="w-6 h-6" />
+              <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">{portalName}</h1>
-              <p className="text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">CAMPUS ADMINISTRATION</p>
+              <p className="text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">ENTERPRISE MANAGEMENT SUITE</p>
             </div>
           </div>
 
@@ -369,7 +370,7 @@ export default function App() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Dean / Faculty Email</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Enterprise Admin / Dean Email</label>
               <input
                 type="email"
                 required
@@ -383,7 +384,7 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Administrative Password</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Master Key Password</label>
               <input
                 type="password"
                 required
@@ -401,7 +402,7 @@ export default function App() {
               disabled={authLoading}
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 cursor-pointer"
             >
-              {authLoading ? 'Verifying Faculty Access...' : 'Sign In to Campus SMS'}
+              {authLoading ? 'Verifying Enterprise Authority...' : 'Authorize Enterprise Access'}
             </button>
           </form>
         </div>
@@ -420,11 +421,11 @@ export default function App() {
       }`}>
         <button onClick={() => setActiveTab('overview')} className="flex items-center gap-2.5 text-left focus:outline-none">
           <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md">
-            <GraduationCap className="w-4 h-4" />
+            <Building2 className="w-4 h-4" />
           </div>
           <div>
             <div className="text-sm font-bold">{portalName}</div>
-            <div className="text-[9px] font-bold text-indigo-400 uppercase">STUDENT PORTAL</div>
+            <div className="text-[9px] font-bold text-indigo-400 uppercase">ENTERPRISE CORE</div>
           </div>
         </button>
 
@@ -442,7 +443,7 @@ export default function App() {
         <div onClick={() => setMobileMenuOpen(false)} className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar Navigation */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 p-6 flex flex-col justify-between border-r select-none transition-transform duration-300 ease-in-out
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -456,14 +457,14 @@ export default function App() {
             className="flex items-center gap-3 group text-left w-full focus:outline-none cursor-pointer"
           >
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5" />
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
               <div className="text-base font-bold tracking-tight group-hover:text-indigo-400 transition-colors">
                 {portalName}
               </div>
               <div className="text-[10px] font-bold tracking-widest text-indigo-400 uppercase">
-                STUDENT SYSTEM
+                ENTERPRISE CONSOLE
               </div>
             </div>
           </button>
@@ -495,7 +496,7 @@ export default function App() {
         <div className="hidden md:block h-20" />
       </aside>
 
-      {/* Floating Dean Profile Card */}
+      {/* Floating Administrator Badge */}
       <div className={`fixed bottom-4 left-4 md:bottom-6 md:left-6 z-40 w-56 md:w-60 p-3 md:p-3.5 rounded-2xl border flex items-center justify-between shadow-2xl backdrop-blur-md transition-all ${
         theme === 'dark'
           ? 'bg-[#0e122b]/95 border-slate-800/90 shadow-black/60'
@@ -503,11 +504,11 @@ export default function App() {
       }`}>
         <div className="flex items-center gap-2.5 md:gap-3 overflow-hidden">
           <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
-            DA
+            EA
           </div>
           <div className="text-left truncate">
-            <div className="text-xs font-bold leading-tight truncate">Dean / Faculty</div>
-            <div className="text-[10px] text-slate-400">Head Administrator</div>
+            <div className="text-xs font-bold leading-tight truncate">Enterprise Admin</div>
+            <div className="text-[10px] text-slate-400">Master Authority</div>
           </div>
         </div>
         <button 
@@ -523,13 +524,13 @@ export default function App() {
       <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto w-full">
         <div className="mb-6 md:mb-8">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-            {activeTab === 'overview' && 'Campus Overview & Telemetry'}
-            {activeTab === 'students' && 'Student Directory & Admissions'}
-            {activeTab === 'courses' && 'Academic Departments & Degree Programs'}
-            {activeTab === 'settings' && 'Institutional Settings'}
+            {activeTab === 'overview' && 'Enterprise System Telemetry'}
+            {activeTab === 'students' && 'Directory, Roles & Provisioning'}
+            {activeTab === 'courses' && 'Operational Units & Degree Programs'}
+            {activeTab === 'settings' && 'Enterprise Platform Settings'}
           </h1>
           <p className="text-xs text-slate-400 mt-1 truncate">
-            Administrator: <span className="text-slate-300 font-medium">{user?.email || 'akshatnanawati2704@gmail.com'}</span>
+            Authenticated Admin: <span className="text-slate-300 font-medium">{user?.email || 'akshatnanawati2704@gmail.com'}</span>
           </p>
         </div>
 
@@ -540,15 +541,15 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 1: OVERVIEW DASHBOARD --- */}
+        {/* --- TAB 1: OVERVIEW --- */}
         {activeTab === 'overview' && (
           <div className="space-y-6 md:space-y-8 max-w-6xl pb-24 md:pb-16">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
               {[
-                { label: 'Total Enrolled Students', val: stats.totalUsers },
-                { label: 'Active Students', val: stats.activeUsers },
-                { label: 'Academic Programs', val: courses.length },
-                { label: 'Academic Term', val: maintenanceMode ? 'Semester Freeze' : 'Active Semester' }
+                { label: 'Total Registered Members', val: stats.totalUsers },
+                { label: 'Active Enrolled', val: stats.activeUsers },
+                { label: 'Authorized Programs', val: courses.length },
+                { label: 'Operating Mode', val: maintenanceMode ? 'System Freeze' : 'Active Operational' }
               ].map((card, i) => (
                 <div
                   key={i}
@@ -567,15 +568,15 @@ export default function App() {
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold">Recently Enrolled Students</h2>
-                  <p className="text-xs text-slate-400">Newly matriculated students registered in the platform</p>
+                  <h2 className="text-base sm:text-lg font-bold">Recent Directory Provisions</h2>
+                  <p className="text-xs text-slate-400">Newly assigned privileges and enrolled accounts</p>
                 </div>
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Provision New User</span>
+                  <span>Provision New Member</span>
                 </button>
               </div>
 
@@ -583,8 +584,8 @@ export default function App() {
                 <table className="w-full text-left text-xs sm:text-sm min-w-[550px]">
                   <thead>
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
-                      <th className="pb-3 px-2">Roll No</th>
-                      <th className="pb-3 px-2">Student Name</th>
+                      <th className="pb-3 px-2">Roll No / ID</th>
+                      <th className="pb-3 px-2">Member Name</th>
                       <th className="pb-3 px-2">Role / Program</th>
                       <th className="pb-3 px-2">Status</th>
                     </tr>
@@ -596,7 +597,7 @@ export default function App() {
                           {isRollNoDisabled(s.role) ? (
                             <span className="text-slate-500 text-xs italic tracking-wider">—</span>
                           ) : (
-                            s.rollNo || `CS-2026-${s.id}`
+                            s.rollNo || `ENT-2026-${s.id}`
                           )}
                         </td>
                         <td className="py-3 px-2 font-semibold">
@@ -622,24 +623,24 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 2: STUDENT ROSTER --- */}
+        {/* --- TAB 2: DIRECTORY / ROSTER --- */}
         {activeTab === 'students' && (
           <div className="space-y-6 max-w-6xl pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold">Student Directory</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Filter, search, and manage student admissions</p>
+                <h2 className="text-lg sm:text-xl font-bold">Enterprise Directory</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Filter, search, and audit all system accounts</p>
               </div>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Provision New User</span>
+                <span>Provision New Member</span>
               </button>
             </div>
 
-            {/* Filter Bar */}
+            {/* Filter Bar: ALL | ADMIN | TEACHER | ENROLLED | ON LEAVE */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -683,7 +684,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Table */}
+            {/* Table View */}
             <div className={`p-5 sm:p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
             }`}>
@@ -691,7 +692,7 @@ export default function App() {
                 <table className="w-full text-left text-xs sm:text-sm min-w-[650px]">
                   <thead>
                     <tr className="border-b border-slate-800/60 text-slate-400 text-[11px] uppercase font-bold">
-                      <th className="pb-3 px-2">Roll No</th>
+                      <th className="pb-3 px-2">Roll No / ID</th>
                       <th className="pb-3 px-2">User / Student</th>
                       <th className="pb-3 px-2">Role / Program</th>
                       <th className="pb-3 px-2">Status</th>
@@ -702,7 +703,7 @@ export default function App() {
                     {filteredStudents.length === 0 ? (
                       <tr>
                         <td colSpan="5" className="text-center py-6 text-slate-400 text-xs">
-                          No records found matching "{selectedFilter}".
+                          No records match "{selectedFilter}".
                         </td>
                       </tr>
                     ) : (
@@ -712,7 +713,7 @@ export default function App() {
                             {isRollNoDisabled(s.role) ? (
                               <span className="text-slate-500 text-xs italic tracking-wider">—</span>
                             ) : (
-                              s.rollNo || `CS-2026-${s.id}`
+                              s.rollNo || `ENT-2026-${s.id}`
                             )}
                           </td>
                           <td className="py-3 px-2 font-semibold">
@@ -733,7 +734,7 @@ export default function App() {
                             <button
                               onClick={() => handleDeleteStudent(s.id)}
                               className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                              title="Delete record"
+                              title="Delete member record"
                             >
                               <Trash2 className="w-4 h-4 inline" />
                             </button>
@@ -748,13 +749,13 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 3: ACADEMIC DEPARTMENTS & DEGREES --- */}
+        {/* --- TAB 3: OPERATIONAL UNITS & DEGREES --- */}
         {activeTab === 'courses' && (
           <div className="max-w-5xl space-y-6 pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold">Academic Degrees & Programs</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Define and curate authorized courses offered by the institution</p>
+                <h2 className="text-xl font-bold">Programs & Operational Units</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Define programs and units authorized under this enterprise</p>
               </div>
               <button
                 type="button"
@@ -762,7 +763,7 @@ export default function App() {
                 className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Degree Program</span>
+                <span>Add Program Unit</span>
               </button>
             </div>
 
@@ -785,7 +786,7 @@ export default function App() {
                       <button
                         onClick={() => handleDeleteCourse(c.id, c.code)}
                         className="text-slate-500 hover:text-red-400 p-1 transition cursor-pointer"
-                        title="Remove Degree Program"
+                        title="Remove Program Unit"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -795,8 +796,8 @@ export default function App() {
                   </div>
 
                   <div className="pt-4 mt-4 border-t border-slate-800/40 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Program Head:</span>
-                    <span className="font-semibold text-slate-300">{c.head || 'Assigned Dean'}</span>
+                    <span>Director / Lead:</span>
+                    <span className="font-semibold text-slate-300">{c.head || 'Assigned Lead'}</span>
                   </div>
                 </div>
               ))}
@@ -804,21 +805,21 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 4: ACADEMIC SETTINGS --- */}
+        {/* --- TAB 4: PLATFORM CONTROLS --- */}
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-4xl pb-24 md:pb-16">
             <div className={`p-5 sm:p-8 rounded-3xl border shadow-xl ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-slate-100'
             }`}>
               <div className="mb-6">
-                <h2 className="text-base sm:text-lg font-bold">Academic Portal Configuration</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Control registration status and semester grade locks</p>
+                <h2 className="text-base sm:text-lg font-bold">Enterprise Platform Configuration</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Manage portal identity and systemic access toggles</p>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-5">
                 <div>
                   <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    INSTITUTION / PORTAL TITLE
+                    ORGANIZATION / PORTAL TITLE
                   </label>
                   <input
                     type="text"
@@ -836,8 +837,8 @@ export default function App() {
                   theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div className="pr-3">
-                    <div className="text-xs sm:text-sm font-bold">Student Self-Registration</div>
-                    <div className="text-[11px] sm:text-xs text-slate-400">Permit external applicants to register directly online</div>
+                    <div className="text-xs sm:text-sm font-bold">Public Self-Registration</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400">Allow members to register directly via onboarding gateway</div>
                   </div>
                   <input
                     type="checkbox"
@@ -851,8 +852,8 @@ export default function App() {
                   theme === 'dark' ? 'bg-[#060813] border-slate-800/80' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div className="pr-3">
-                    <div className="text-xs sm:text-sm font-bold">Semester Grade Freeze (Maintenance Mode)</div>
-                    <div className="text-[11px] sm:text-xs text-slate-400">Lock grade updates and display term evaluation notification</div>
+                    <div className="text-xs sm:text-sm font-bold">Maintenance Freeze Mode</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400">Lock modifications across all tables during system audits</div>
                   </div>
                   <input
                     type="checkbox"
@@ -866,7 +867,7 @@ export default function App() {
                   type="submit"
                   className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
                 >
-                  Save Academic Settings
+                  Commit Enterprise Settings
                 </button>
               </form>
             </div>
@@ -899,14 +900,14 @@ export default function App() {
                   className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Log Out of Session</span>
+                  <span>Log Out of Console</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
                     loadData();
-                    setFeedback('Data synchronized with live database.');
+                    setFeedback('Enterprise database synchronized.');
                     setTimeout(() => setFeedback(''), 3000);
                   }}
                   className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
@@ -916,7 +917,7 @@ export default function App() {
                   }`}
                 >
                   <RefreshCw className="w-4 h-4 text-indigo-400" />
-                  <span>Sync Campus Data</span>
+                  <span>Sync Server Data</span>
                 </button>
 
                 <button
@@ -929,7 +930,7 @@ export default function App() {
                   }`}
                 >
                   <Download className="w-4 h-4 text-emerald-400" />
-                  <span>Export Student Roster</span>
+                  <span>Export JSON Audit</span>
                 </button>
 
                 <button
@@ -942,7 +943,7 @@ export default function App() {
                   }`}
                 >
                   <Activity className="w-4 h-4 text-cyan-400" />
-                  <span>{healthStatus || 'Test API Ping'}</span>
+                  <span>{healthStatus || 'Test Server Latency'}</span>
                 </button>
 
                 <button
@@ -950,7 +951,7 @@ export default function App() {
                   onClick={handleReset}
                   className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all cursor-pointer"
                 >
-                  <span>Reset Sample Records</span>
+                  <span>Reset Seed Records</span>
                 </button>
               </div>
             </div>
@@ -958,7 +959,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- ADD NEW DEGREE MODAL --- */}
+      {/* --- ADD PROGRAM / DEGREE MODAL --- */}
       {showCourseModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-[460px] bg-[#0c1021] border border-slate-800/90 text-white rounded-3xl p-6 sm:p-7 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
@@ -971,14 +972,14 @@ export default function App() {
             </button>
 
             <div className="mb-5">
-              <h2 className="text-xl font-bold tracking-tight">Add Degree Program</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Register a new academic degree or department program</p>
+              <h2 className="text-xl font-bold tracking-tight">Add Program Unit</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Register a recognized program or business unit</p>
             </div>
 
             <form onSubmit={handleAddCourse} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  PROGRAM CODE / SHORT IDENTIFIER
+                  PROGRAM CODE / IDENTIFIER
                 </label>
                 <input
                   type="text"
@@ -992,7 +993,7 @@ export default function App() {
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  FULL DEGREE TITLE
+                  FULL PROGRAM TITLE
                 </label>
                 <input
                   type="text"
@@ -1023,13 +1024,13 @@ export default function App() {
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    PROGRAM HEAD
+                    DIRECTOR / HEAD
                   </label>
                   <input
                     type="text"
                     value={newCourse.head}
                     onChange={(e) => setNewCourse({ ...newCourse, head: e.target.value })}
-                    placeholder="Prof. / Dr. Name"
+                    placeholder="Prof. / Dr. / Director"
                     className="w-full px-3.5 py-3 rounded-xl bg-[#060813] border border-slate-800 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 transition"
                   />
                 </div>
@@ -1037,7 +1038,7 @@ export default function App() {
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  FACULTY / DEPARTMENT
+                  DEPARTMENT / FACULTY
                 </label>
                 <input
                   type="text"
@@ -1060,7 +1061,7 @@ export default function App() {
                   type="submit"
                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition cursor-pointer"
                 >
-                  Register Program
+                  Confirm Unit
                 </button>
               </div>
             </form>
@@ -1068,7 +1069,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- PROVISION NEW USER / STUDENT MODAL --- */}
+      {/* --- PROVISION NEW USER MODAL --- */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-[440px] bg-[#0c1021] border border-slate-800/90 text-white rounded-3xl p-6 sm:p-7 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
@@ -1086,7 +1087,6 @@ export default function App() {
             </div>
 
             <form onSubmit={handleProvisionUser} className="space-y-4">
-              {/* Display Name */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                   DISPLAY NAME
@@ -1101,7 +1101,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Email Address */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                   EMAIL ADDRESS
@@ -1116,9 +1115,8 @@ export default function App() {
                 />
               </div>
 
-              {/* Dropdown Row */}
+              {/* Dropdown 1 and Dropdown 2 */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Dropdown 1: Role / Degree (Includes Admin, Teacher, Viewer, Editor + Degrees) */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     ROLE / DEGREE
@@ -1134,7 +1132,7 @@ export default function App() {
                       backgroundSize: '1em'
                     }}
                   >
-                    <optgroup label="System Roles" className="bg-[#0c1021] text-indigo-400 font-semibold">
+                    <optgroup label="System & Staff Roles" className="bg-[#0c1021] text-indigo-400 font-semibold">
                       <option value="Admin" className="bg-[#0c1021] text-slate-100 font-normal">Admin</option>
                       <option value="Teacher" className="bg-[#0c1021] text-slate-100 font-normal">Teacher</option>
                       <option value="Viewer" className="bg-[#0c1021] text-slate-100 font-normal">Viewer</option>
@@ -1150,7 +1148,6 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Dropdown 2: Status */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     STATUS
@@ -1173,10 +1170,10 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Roll Number Field: Enabled for Viewer, Editor, and Degrees. Disabled ONLY for Admin and Teacher */}
+              {/* Roll No / Identifier Field (Exempts Admin & Teacher only) */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  ROLL NUMBER {isRollNoDisabled(newStudent.role) ? '(NOT APPLICABLE FOR STAFF)' : '(CUSTOM ASSIGNMENT)'}
+                  ROLL NUMBER / IDENTIFIER {isRollNoDisabled(newStudent.role) ? '(NOT APPLICABLE FOR STAFF)' : '(CUSTOM ASSIGNMENT)'}
                 </label>
                 <input
                   type="text"
