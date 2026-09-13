@@ -264,11 +264,11 @@ export default function App() {
 
   // --- Main Dashboard & Settings Screen ---
   return (
-    <div className={`min-h-screen flex font-sans transition-colors duration-200 ${
+    <div className={`min-h-screen flex font-sans transition-colors duration-200 relative ${
       theme === 'dark' ? 'bg-[#060813] text-slate-100' : 'bg-[#f4f6fb] text-slate-900'
     }`}>
       {/* Sidebar */}
-      <aside className={`w-72 border-r flex flex-col justify-between p-6 select-none ${
+      <aside className={`w-72 border-r flex flex-col justify-between p-6 select-none shrink-0 ${
         theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
       }`}>
         <div className="space-y-8">
@@ -322,28 +322,33 @@ export default function App() {
           </nav>
         </div>
 
-        {/* User Card at bottom of sidebar (Untouched) */}
-        <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
-          theme === 'dark' ? 'bg-[#0e122b] border-slate-800/80' : 'bg-slate-50 border-slate-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
-              MA
-            </div>
-            <div className="text-left">
-              <div className="text-xs font-bold leading-tight">Master Admin</div>
-              <div className="text-[10px] text-slate-400">Admin</div>
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            title="Log Out"
-            className="text-slate-400 hover:text-red-400 transition-colors p-1"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </button>
-        </div>
+        {/* Space reserved at the bottom of the sidebar to prevent overlap */}
+        <div className="h-20" />
       </aside>
+
+      {/* Floating Master Admin Profile Card (Stays in place when scrolling) */}
+      <div className={`fixed bottom-6 left-6 z-40 w-60 p-3.5 rounded-2xl border flex items-center justify-between shadow-2xl backdrop-blur-md transition-all ${
+        theme === 'dark'
+          ? 'bg-[#0e122b]/95 border-slate-800/90 shadow-black/60'
+          : 'bg-white/95 border-slate-200 shadow-slate-300'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shadow-indigo-500/30">
+            MA
+          </div>
+          <div className="text-left">
+            <div className="text-xs font-bold leading-tight">Master Admin</div>
+            <div className="text-[10px] text-slate-400">Admin</div>
+          </div>
+        </div>
+        <button 
+          onClick={handleLogout}
+          title="Log Out"
+          className="text-slate-400 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-slate-800/40"
+        >
+          <ExternalLink className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Main Content Area */}
       <main className="flex-1 p-10 overflow-y-auto">
@@ -369,7 +374,7 @@ export default function App() {
 
         {/* --- SETTINGS TAB VIEW --- */}
         {activeTab === 'settings' && (
-          <div className="space-y-6 max-w-4xl">
+          <div className="space-y-6 max-w-4xl pb-16">
             {/* Main Configuration Card */}
             <div className={`p-8 rounded-3xl border shadow-xl ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200 shadow-slate-100'
@@ -534,7 +539,7 @@ export default function App() {
 
         {/* --- OVERVIEW TAB VIEW --- */}
         {activeTab === 'overview' && (
-          <div className="space-y-8 max-w-6xl">
+          <div className="space-y-8 max-w-6xl pb-16">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: 'Total Users', val: stats.totalUsers },
@@ -605,7 +610,7 @@ export default function App() {
 
         {/* --- TEAM & USERS TAB VIEW --- */}
         {activeTab === 'team' && (
-          <div className="space-y-6 max-w-6xl">
+          <div className="space-y-6 max-w-6xl pb-16">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold">Team Directory</h2>
@@ -666,7 +671,7 @@ export default function App() {
 
         {/* --- PERMISSIONS TAB VIEW --- */}
         {activeTab === 'permissions' && (
-          <div className="max-w-4xl space-y-6">
+          <div className="max-w-4xl space-y-6 pb-16">
             <div className={`p-8 rounded-3xl border ${
               theme === 'dark' ? 'bg-[#090d1f] border-slate-800/80' : 'bg-white border-slate-200'
             }`}>
@@ -740,7 +745,7 @@ export default function App() {
                     value={newMember.role}
                     onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
                     className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
                     <option value="Viewer">Viewer</option>
@@ -755,7 +760,7 @@ export default function App() {
                     value={newMember.status}
                     onChange={(e) => setNewMember({ ...newMember, status: e.target.value })}
                     className={`w-full px-3 py-2 text-sm border rounded-xl outline-none ${
-                      theme === 'dark' ? 'bg-[#060813] border-slate-800 text-white' : 'bg-slate-50 border-slate-300'
+                      theme === 'dark' ? 'bg-[#060813] border-slate-800' : 'bg-slate-50 border-slate-300'
                     }`}
                   >
                     <option value="Active">Active</option>
