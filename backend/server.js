@@ -2,17 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Admin credentials from .env or production fallbacks
 const CUSTOM_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'akshatnanawati2704@gmail.com';
 const CUSTOM_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin2704';
 
-// Enable CORS for all incoming requests
+// CORS setup
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -21,7 +19,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// Healthcheck route (visiting URL in browser confirms server is awake)
+// Health check
 app.get('/', (req, res) => {
   res.json({ status: 'API is healthy and online' });
 });
@@ -34,10 +32,9 @@ let users = [
   { id: '4', name: 'Sneha Patel', email: 'sneha@example.com', role: 'Editor', status: 'Active', joinedAt: '2025-04-10' }
 ];
 
-// Unified Login Handler
+// Handlers
 const handleLogin = (req, res) => {
   const { email, password } = req.body;
-
   if (email === CUSTOM_ADMIN_EMAIL && password === CUSTOM_ADMIN_PASSWORD) {
     return res.json({
       token: 'nexus_secure_token_' + Date.now(),
@@ -49,17 +46,10 @@ const handleLogin = (req, res) => {
       }
     });
   }
-
   return res.status(401).json({ error: 'Invalid email or password.' });
 };
 
-// Accept login on all common path variations to prevent 404s
-app.post('/api/auth/login', handleLogin);
-app.post('/api/login', handleLogin);
-app.post('/auth/login', handleLogin);
-
-// Dashboard Statistics
-app.get('/api/stats', (req, res) => {
+const handleGetStats = (req, res) => {
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.status === 'Active').length;
   const totalAdmins = users.filter(u => u.role === 'Admin').length;
@@ -70,14 +60,13 @@ app.get('/api/stats', (req, res) => {
     totalAdmins,
     systemStatus: 'Optimal'
   });
-});
+};
 
-// User Management Routes
-app.get('/api/users', (req, res) => {
+const handleGetUsers = (req, res) => {
   res.json(users);
-});
+};
 
-app.post('/api/users', (req, res) => {
+const handleCreateUser = (req, res) => {
   const { name, email, role, status } = req.body;
   if (!name || !email) {
     return res.status(400).json({ error: 'Name and email are required.' });
@@ -94,9 +83,9 @@ app.post('/api/users', (req, res) => {
 
   users.unshift(newUser);
   res.status(201).json(newUser);
-});
+};
 
-app.put('/api/users/:id', (req, res) => {
+const handleUpdateUser = (req, res) => {
   const { id } = req.params;
   const { name, email, role, status } = req.body;
 
@@ -114,13 +103,37 @@ app.put('/api/users/:id', (req, res) => {
   };
 
   res.json(users[index]);
-});
+};
 
-app.delete('/api/users/:id', (req, res) => {
+const handleDeleteUser = (req, res) => {
   const { id } = req.params;
   users = users.filter(u => u.id !== id);
   res.json({ message: 'User deleted successfully.' });
-});
+};
+
+// --- Routes (Registered for both with and without '/api') ---
+
+// Auth
+app.post('/api/auth/login', handleLogin);
+app.post('/api/login', handleLogin);
+app.post('/auth/login', handleLogin);
+
+// Stats
+app.get('/api/stats', handleGetStats);
+app.get('/stats', handleGetStats);
+
+// Users
+app.get('/api/users', handleGetUsers);
+app.get('/users', handleGetUsers);
+
+app.post('/api/users', handleCreateUser);
+app.post('/users', handleCreateUser);
+
+app.put('/api/users/:id', handleUpdateUser);
+app.put('/users/:id', handleUpdateUser);
+
+app.delete('/api/users/:id', handleDeleteUser);
+app.delete('/users/:id', handleDeleteUser);
 
 // Start Server
 app.listen(PORT, () => {
