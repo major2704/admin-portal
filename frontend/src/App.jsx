@@ -36,7 +36,7 @@ export default function App() {
   });
 
   const [theme, setTheme] = useState(() => localStorage.getItem('nexus_theme') || 'dark');
-  const [activeTab, setActiveTab] = useState('courses'); // 'overview' | 'students' | 'courses' | 'settings'
+  const [activeTab, setActiveTab] = useState('students'); // 'overview' | 'students' | 'courses' | 'settings'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Platform & Academic Settings
@@ -62,15 +62,17 @@ export default function App() {
   ]);
   const [stats, setStats] = useState({ totalUsers: 4, activeUsers: 3, totalAdmins: 4, systemStatus: 'Academic Term Active' });
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCourse, setFilterCourse] = useState('All');
+  
+  // Updated Active Filter Pill State
+  const [selectedFilter, setSelectedFilter] = useState('All');
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStudent, setNewStudent] = useState({
     name: '',
     email: '',
-    role: 'BCA',
-    status: 'Active'
+    role: 'Teacher',
+    status: 'Enrolled'
   });
 
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -196,7 +198,6 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setCourses(courses.filter((c) => c.id !== id));
-        if (filterCourse === code) setFilterCourse('All');
         loadData();
       }
     } catch (err) {
@@ -204,7 +205,7 @@ export default function App() {
     }
   };
 
-  // Student Actions
+  // Student / User Actions
   const handleProvisionUser = async (e) => {
     e.preventDefault();
     try {
@@ -227,7 +228,7 @@ export default function App() {
       if (res.ok) {
         setStudents([data, ...students]);
         setShowAddModal(false);
-        setNewStudent({ name: '', email: '', role: courses[0]?.code || 'BCA', status: 'Active' });
+        setNewStudent({ name: '', email: '', role: 'Teacher', status: 'Enrolled' });
         loadData();
       }
     } catch (err) {
@@ -304,7 +305,7 @@ export default function App() {
     }
   };
 
-  // Filtered Students
+  // Filter List (Matches ALL, ADMIN, TEACHER, ENROLLED, ON LEAVE)
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
       const query = searchQuery.toLowerCase();
@@ -313,14 +314,16 @@ export default function App() {
         s.email?.toLowerCase().includes(query) ||
         s.rollNo?.toLowerCase().includes(query);
       
-      const matchesCourse = 
-        filterCourse === 'All' || 
-        s.course === filterCourse || 
-        s.role === filterCourse;
+      let matchesFilter = true;
+      if (selectedFilter !== 'All') {
+        const roleMatch = s.role?.toLowerCase() === selectedFilter.toLowerCase();
+        const statusMatch = s.status?.toLowerCase() === selectedFilter.toLowerCase();
+        matchesFilter = roleMatch || statusMatch;
+      }
 
-      return matchesSearch && matchesCourse;
+      return matchesSearch && matchesFilter;
     });
-  }, [students, searchQuery, filterCourse]);
+  }, [students, searchQuery, selectedFilter]);
 
   const navItems = [
     { id: 'overview', label: 'Dashboard', icon: GraduationCap },
@@ -573,7 +576,7 @@ export default function App() {
                       <th className="pb-3 px-2">Roll No</th>
                       <th className="pb-3 px-2">Student Name</th>
                       <th className="pb-3 px-2">Role / Program</th>
-                      <th className="pb-3 px-2">Academic Status</th>
+                      <th className="pb-3 px-2">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
@@ -587,7 +590,11 @@ export default function App() {
                         <td className="py-3 px-2 font-medium">{s.role || s.course}</td>
                         <td className="py-3 px-2">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                            s.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : s.status === 'Admin' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-amber-500/10 text-amber-400'
+                            s.status === 'Enrolled' || s.status === 'Active' 
+                              ? 'bg-emerald-500/10 text-emerald-400' 
+                              : s.status === 'On Leave' || s.status === 'Inactive' 
+                              ? 'bg-amber-500/10 text-amber-400' 
+                              : 'bg-indigo-500/10 text-indigo-400'
                           }`}>
                             {s.status}
                           </span>
@@ -601,7 +608,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 2: STUDENT ROSTER --- */}
+        {/* --- TAB 2: STUDENT ROSTER (UPDATED FILTER BAR) --- */}
         {activeTab === 'students' && (
           <div className="space-y-6 max-w-6xl pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -618,7 +625,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Dynamic Program Filter Pills Generated from Courses Store */}
+            {/* Filter Bar: ALL | ADMIN | TEACHER | ENROLLED | ON LEAVE */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -628,7 +635,7 @@ export default function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by name, roll no, or email..."
+                  placeholder="Filter by name or email..."
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm outline-none transition ${
                     theme === 'dark'
                       ? 'bg-[#090d1f] border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500'
@@ -637,15 +644,16 @@ export default function App() {
                 />
               </div>
 
+              {/* Exact Pill Options */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs font-semibold text-slate-400 mr-1.5">Program:</span>
-                {['All', ...courses.map(c => c.code)].map((cCode) => {
-                  const isSelected = filterCourse === cCode;
+                <span className="text-xs font-semibold text-slate-400 mr-1.5">Role:</span>
+                {['All', 'Admin', 'Teacher', 'Enrolled', 'On Leave'].map((pill) => {
+                  const isSelected = selectedFilter.toLowerCase() === pill.toLowerCase();
                   return (
                     <button
-                      key={cCode}
+                      key={pill}
                       type="button"
-                      onClick={() => setFilterCourse(cCode)}
+                      onClick={() => setSelectedFilter(pill)}
                       className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
@@ -654,7 +662,7 @@ export default function App() {
                           : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 shadow-sm'
                       }`}
                     >
-                      {cCode}
+                      {pill}
                     </button>
                   );
                 })}
@@ -680,7 +688,7 @@ export default function App() {
                     {filteredStudents.length === 0 ? (
                       <tr>
                         <td colSpan="5" className="text-center py-6 text-slate-400 text-xs">
-                          No records found matching your criteria.
+                          No records found matching "{selectedFilter}".
                         </td>
                       </tr>
                     ) : (
@@ -694,7 +702,11 @@ export default function App() {
                           <td className="py-3 px-2 font-medium">{s.role || s.course}</td>
                           <td className="py-3 px-2">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                              s.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : s.status === 'Admin' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-amber-500/10 text-amber-400'
+                              s.status === 'Enrolled' || s.status === 'Active' 
+                                ? 'bg-emerald-500/10 text-emerald-400' 
+                                : s.status === 'On Leave' || s.status === 'Inactive' 
+                                ? 'bg-amber-500/10 text-amber-400' 
+                                : 'bg-indigo-500/10 text-indigo-400'
                             }`}>
                               {s.status}
                             </span>
@@ -718,7 +730,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- TAB 3: ACADEMIC DEPARTMENTS & DEGREES (ADMIN MANAGEMENT) --- */}
+        {/* --- TAB 3: ACADEMIC DEPARTMENTS & DEGREES --- */}
         {activeTab === 'courses' && (
           <div className="max-w-5xl space-y-6 pb-24 md:pb-16">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -928,7 +940,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- ADD NEW DEGREE MODAL (FOR ADMIN) --- */}
+      {/* --- ADD NEW DEGREE MODAL --- */}
       {showCourseModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-[460px] bg-[#0c1021] border border-slate-800/90 text-white rounded-3xl p-6 sm:p-7 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
@@ -1085,10 +1097,10 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Dynamically populated Role / Degree dropdown */}
+                {/* Role / Type Dropdown */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    ROLE / PROGRAM
+                    ROLE
                   </label>
                   <select
                     value={newStudent.role}
@@ -1101,17 +1113,13 @@ export default function App() {
                       backgroundSize: '1em'
                     }}
                   >
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.code} className="bg-[#0c1021]">
-                        {c.code}
-                      </option>
-                    ))}
                     <option value="Admin" className="bg-[#0c1021]">Admin</option>
-                    <option value="Editor" className="bg-[#0c1021]">Editor</option>
-                    <option value="Viewer" className="bg-[#0c1021]">Viewer</option>
+                    <option value="Teacher" className="bg-[#0c1021]">Teacher</option>
+                    <option value="Student" className="bg-[#0c1021]">Student</option>
                   </select>
                 </div>
 
+                {/* Status Dropdown */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                     STATUS
@@ -1127,9 +1135,10 @@ export default function App() {
                       backgroundSize: '1em'
                     }}
                   >
+                    <option value="Enrolled" className="bg-[#0c1021]">Enrolled</option>
+                    <option value="On Leave" className="bg-[#0c1021]">On Leave</option>
                     <option value="Active" className="bg-[#0c1021]">Active</option>
                     <option value="Inactive" className="bg-[#0c1021]">Inactive</option>
-                    <option value="Admin" className="bg-[#0c1021]">Admin</option>
                   </select>
                 </div>
               </div>
