@@ -32,19 +32,19 @@ const initialCourses = [
   { id: '4', code: 'B.Sc IT', name: 'B.Sc Information Technology', duration: '6 Semesters', dept: 'Applied Sciences', head: 'Prof. N. Patel' }
 ];
 
-// Initial Student Seed Data
+// Initial Student Seed Data (Admin and Teacher have no Roll Number)
 const initialStudents = [
   { id: '1', rollNo: 'CS-2026-01', name: 'Aarav Sharma', email: 'aarav.sharma@campus.edu', course: 'BCA', year: '3rd Year', role: 'BCA', status: 'Active', joinedAt: '2025-01-12' },
   { id: '2', rollNo: 'CS-2026-02', name: 'Pooja Verma', email: 'pooja.verma@campus.edu', course: 'BCA', year: '2nd Year', role: 'BCA', status: 'Active', joinedAt: '2025-02-04' },
   { id: '3', rollNo: 'CS-2026-03', name: 'Rohan Mehta', email: 'rohan.mehta@campus.edu', course: 'B.Tech CS', year: '1st Year', role: 'B.Tech CS', status: 'Inactive', joinedAt: '2025-03-18' },
-  { id: '4', rollNo: 'CS-2026-04', name: 'Sneha Patel', email: 'sneha.patel@campus.edu', course: 'MCA', year: '1st Year', role: 'MCA', status: 'Admin', joinedAt: '2025-04-10' }
+  { id: '4', rollNo: '', name: 'Sneha Patel', email: 'sneha.patel@campus.edu', course: 'Staff', year: 'Faculty', role: 'Admin', status: 'Active', joinedAt: '2025-04-10' }
 ];
 
 // In-Memory Stores
 let students = [...initialStudents];
 let courses = [...initialCourses];
 let platformSettings = {
-  portalName: 'EduNexus SMS',
+  portalName: 'NexusAdmin Enterprise',
   publicRegistrations: true,
   maintenanceMode: false,
   theme: 'dark'
@@ -72,7 +72,7 @@ const handleGetStats = (req, res) => {
     totalUsers: students.length,
     activeUsers: students.filter(s => s.status === 'Active' || s.status === 'Enrolled').length,
     totalAdmins: courses.length,
-    systemStatus: platformSettings.maintenanceMode ? 'Semester Freeze' : 'Academic Term Active'
+    systemStatus: platformSettings.maintenanceMode ? 'System Freeze' : 'Enterprise Operational'
   });
 };
 
@@ -111,20 +111,52 @@ const handleCreateStudent = (req, res) => {
     return res.status(400).json({ error: 'Student name and email are required.' });
   }
 
+  const assignedRole = role || course || 'Viewer';
+  const isStaff = assignedRole === 'Admin' || assignedRole === 'Teacher';
+
   const newStudent = {
     id: Date.now().toString(),
-    rollNo: rollNo || `CS-${new Date().getFullYear()}-${Math.floor(10 + Math.random() * 90)}`,
-    name,
-    email,
-    course: course || role || 'BCA',
-    year: year || '1st Year',
-    role: role || course || 'Viewer',
-    status: status || 'Active',
+    // Exclude roll number for Admin and Teacher
+    rollNo: isStaff ? '' : (rollNo !== undefined ? rollNo.trim() : `CS-${new Date().getFullYear()}-${Math.floor(10 + Math.random() * 90)}`),
+    name: name.trim(),
+    email: email.trim(),
+    course: course || assignedRole,
+    year: year || (isStaff ? 'Staff' : '1st Year'),
+    role: assignedRole,
+    status: status || 'Enrolled',
     joinedAt: new Date().toISOString().split('T')[0]
   };
 
   students.unshift(newStudent);
   res.status(201).json(newStudent);
+};
+
+// Update Student / Roll Number Handler
+const handleUpdateStudent = (req, res) => {
+  const { id } = req.params;
+  const { name, email, rollNo, course, year, role, status } = req.body;
+
+  const index = students.findIndex(s => s.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Record not found.' });
+  }
+
+  const targetRole = role ?? students[index].role;
+  const isStaff = targetRole === 'Admin' || targetRole === 'Teacher';
+
+  students[index] = {
+    ...students[index],
+    name: name !== undefined ? name.trim() : students[index].name,
+    email: email !== undefined ? email.trim() : students[index].email,
+    // Disallow roll numbers for Admin and Teacher
+    rollNo: isStaff ? '' : (rollNo !== undefined ? rollNo.trim() : students[index].rollNo),
+    course: course ?? students[index].course,
+    year: year ?? students[index].year,
+    role: targetRole,
+    status: status ?? students[index].status
+  };
+
+  res.json(students[index]);
 };
 
 const handleDeleteStudent = (req, res) => {
@@ -151,7 +183,7 @@ const handleResetData = (req, res) => {
   students = [...initialStudents];
   courses = [...initialCourses];
   platformSettings = {
-    portalName: 'EduNexus SMS',
+    portalName: 'NexusAdmin Enterprise',
     publicRegistrations: true,
     maintenanceMode: false,
     theme: 'dark'
@@ -185,6 +217,12 @@ app.post('/students', handleCreateStudent);
 app.post('/api/users', handleCreateStudent);
 app.post('/users', handleCreateStudent);
 
+// PUT Handlers for Roll Number & Status updates
+app.put('/api/students/:id', handleUpdateStudent);
+app.put('/students/:id', handleUpdateStudent);
+app.put('/api/users/:id', handleUpdateStudent);
+app.put('/users/:id', handleUpdateStudent);
+
 app.delete('/api/students/:id', handleDeleteStudent);
 app.delete('/students/:id', handleDeleteStudent);
 app.delete('/api/users/:id', handleDeleteStudent);
@@ -200,5 +238,5 @@ app.post('/api/reset', handleResetData);
 app.post('/reset', handleResetData);
 
 app.listen(PORT, () => {
-  console.log(`EduNexus SMS server live on port ${PORT}`);
+  console.log(`NexusAdmin Enterprise server live on port ${PORT}`);
 });
